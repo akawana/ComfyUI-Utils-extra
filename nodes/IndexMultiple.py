@@ -15,6 +15,9 @@ class IndexMultiple:
                 "starting_index": ("INT", {"default": 0, "min": 0, "step": 1}),
                 "length": ("INT", {"default": 1, "min": 1, "max": 50, "step": 1}),
             },
+            "optional": {
+                "if_none": (ANY_TYPE, {}),
+            }
         }
 
     RETURN_TYPES = (ANY_TYPE,) * 50
@@ -26,7 +29,7 @@ class IndexMultiple:
 
     INPUT_IS_LIST = True
 
-    def execute(self, input_any, starting_index, length):
+    def execute(self, input_any, starting_index, length, if_none=None):
         if isinstance(input_any, (list, tuple)):
             if len(input_any) == 1 and isinstance(input_any[0], (list, tuple)):
                 items = list(input_any[0])
@@ -47,7 +50,10 @@ class IndexMultiple:
             if i < length_val and idx < len(items):
                 result.append(items[idx])
             else:
-                result.append(None)
+                if if_none is not None:
+                    result.append(if_none[0])
+                else:
+                    result.append(None)
 
         return tuple(result)
 
