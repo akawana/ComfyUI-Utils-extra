@@ -7,6 +7,10 @@ This repository will be gradually expanded with new practical utilities.
 
 ---
 
+## My other nodes:
+
+<a href="https://github.com/akawana/ComfyUI-Keybinding-extra" target="_blank">https://github.com/akawana/ComfyUI-Keybinding-extra</a>
+
 ## Nodes
 
 ### Index Multiple
