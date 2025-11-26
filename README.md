@@ -97,7 +97,7 @@ Internally, the node exposes up to **50** outputs (`item_0` … `item_49`), but it
 
 ---
 
-<img src="preview1.jpg" width="100%"/>
+<img src="preview_index_multiple.jpg" width="100%"/>
 
 ---
 
