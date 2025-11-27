@@ -115,6 +115,8 @@ function updateRepeatGroupStateNode(graph, node) {
     }
 }
 
+let repeatGroupStateIntervalStarted = false;
+
 app.registerExtension({
     name: "akawana.RepeatGroupState",
 
@@ -132,5 +134,19 @@ app.registerExtension({
             }
             return await origQueuePrompt.call(this, number, batchSize, ...rest);
         };
+
+        if (!repeatGroupStateIntervalStarted) {
+            repeatGroupStateIntervalStarted = true;
+            setInterval(() => {
+                const graph = app.graph;
+                if (!graph) return;
+                const nodes = graph._nodes || [];
+                for (const node of nodes) {
+                    if (node?.comfyClass === "RepeatGroupState") {
+                        updateRepeatGroupStateNode(graph, node);
+                    }
+                }
+            }, 100);
+        }
     },
 });

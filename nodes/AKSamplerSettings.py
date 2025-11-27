@@ -46,5 +46,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "AKSamplerSettings": "AK Sampler Settings"
+    "AKSamplerSettings": "AKSampler Settings"
 }

@@ -1,111 +1,140 @@
 # ComfyUI-Utils-extra
-ComfyUI-Utils-extra
-
-A small collection of utility nodes for ComfyUI that I could not find in other custom node packs, but which I need in my own work to simplify and speed up complex workflows.
+A compact collection of utility nodes for **ComfyUI** that I could not find in other node packs, but which I need in my production workflow.  
+They help automate repetitive tasks, relay group states, manage sampler parameters, and simplify work with lists.
 
 This repository will be gradually expanded with new practical utilities.
 
 ---
 
-## My other nodes:
-
-<a href="https://github.com/akawana/ComfyUI-Keybinding-extra" target="_blank">https://github.com/akawana/ComfyUI-Keybinding-extra</a>
-
-## Nodes
-
-### Index Multiple
-
-**Category:** `utils/list`  
-**Class name:** `IndexMultiple`
-
-`Index Multiple` takes any **List** or **Batch** as input and creates separate outputs for a selected range inside that list.
-
-The range is defined by two parameters:
-
-- `starting_index` – index of the first item to output (0-based)
-- `length` – how many items to output starting from `starting_index`
-
-In addition, the node has an optional input **`if_none`**.  
-If provided, any missing values (that would normally be `None`) will be replaced with the value from this input.
+## My other nodes
+**ComfyUI-Keybinding-extra**  
+https://github.com/akawana/ComfyUI-Keybinding-extra
 
 ---
+
+# Nodes Overview
+
+---
+
+## Index Multiple
+**Category:** `utils/list`  
+**Class:** `IndexMultiple`
+
+Extracts a specific range from any **List** or **Batch** (images, masks, latents, text — any type) and creates individual outputs for that range.  
+Optionally replaces missing values with a fallback (`if_none`).
+
+<details>
+<summary><b>Show detailed explanation & examples</b></summary>
 
 ### How it works
+1. Connect any List/Batch to `input_any`.
+2. Set:
+   - `starting_index` — the first index to output  
+   - `length` — how many elements to output
+3. Outputs are generated as `item_0 … item_49`.  
+   Only the first `length` outputs are meaningful.
 
-1. You connect a List or Batch (images, masks, latents, text, any type) to `input_any`.
-2. You set:
-   - `starting_index` — where to start (e.g. `3`)
-   - `length` — how many elements you want (e.g. `2`)
-3. The node creates outputs:
-   - `item_0`, `item_1`, `item_2`, …  
-   Internally it will only use the first `length` outputs; the rest will be `None` (or replaced by `if_none`).
+### Example 1 — simple extraction
+Input:  
+`[mask_0, mask_1, mask_2, mask_3, mask_4]`
 
----
-
-### Example 1: Simple range extraction
-
-Input List (e.g. masks):  
-`[mask_0, mask_1, mask_2, mask_3, mask_4]`  (length = 5)
-
-Node settings:
-
+Settings:
 - `starting_index = 3`
 - `length = 2`
 
 Result:
-
 - `item_0 = mask_3`
 - `item_1 = mask_4`
-- `item_2` … `item_49` = `None` (or `if_none` if provided)
+
+### Example 2 — unknown list length + fallback
+If you ask for 5 outputs but receive only 2 items, the rest become `None`, or `if_none` if connected.
+
+</details>
 
 ---
 
-### Example 2: Unknown list length + fallback value
+## AKSampler Settings
+**Category:** `utils/sampler`  
+**Class:** `AKSamplerSettings`
 
-Sometimes you know how many items you want, but you do not know how long the input list will be.
+A minimalistic node that stores three key sampler parameters:
 
-For example:
+- `Seed`
+- `Denoise`
+- `Cfg`
 
-- You want exactly **5 outputs**.
-- The incoming List has only **2** elements: `[A, B]`.
+It outputs them as a **LIST**, suitable for passing into:
 
-Node settings:
-
-- `starting_index = 0`
-- `length = 5`
-- `if_none` is **not** connected
-
-Result:
-
-- `item_0 = A`
-- `item_1 = B`
-- `item_2 = None`
-- `item_3 = None`
-- `item_4 = None`
-
-If you connect something to `if_none` (for example a default mask, image, or any object), all missing values will be replaced with that object:
-
-- `item_2 = if_none`
-- `item_3 = if_none`
-- `item_4 = if_none`
-
-This lets you avoid extra `Switch` / `If` nodes for handling `None` and keeps graphs cleaner.
+- **AKSettings Out**
+- any **SetNode**
+- custom controller graphs
 
 ---
 
-### About the large number of outputs
+## AKSettings Out
+**Category:** `utils/sampler`  
+**Class:** `AKSettingsOut`
 
-Do not be scared by the preview of this node and the fact that it shows so many outputs.
+Expands the LIST received from **AKSampler Settings** into three independent outputs:
 
-Internally, the node exposes up to **50** outputs (`item_0` … `item_49`), but it will only actively use the first `length` items you configured. The rest will be `None` (or `if_none` if provided) and you can simply ignore them.
+- `Seed`
+- `Denoise`
+- `Cfg`
+
+Useful for distributing sampler parameters across multiple samplers or exposing them deeper into the graph.
 
 ---
 
-<img src="preview_index_multiple.jpg" width="100%"/>
+## IsOneOfGroupsActive
+**Category:** `utils/groups`  
+**Class:** `IsOneOfGroupsActive`
+
+Checks the state of all groups whose names **contain a specified substring**.  
+If **at least one** matching group is Active -> output is `true`.  
+If **all** matching groups are Muted/Bypassed -> output is `false`.
+
+<details>
+<summary><b>More details</b></summary>
+
+- Matching is substring-based.  
+  Example: `"Face"` matches `FaceFix`, `FaceDetail`, `Faces`, etc.
+- If no matching groups are found -> output = `false`.
+
+</details>
 
 ---
 
-## Installation
+## RepeatGroupState
+**Category:** `utils/groups`  
+**Class:** `RepeatGroupState`
+
+A connection-free node that synchronizes the state of its own group with the state of other groups matching a given substring.
+
+Logic:
+
+1. Finds groups with names containing the target substring.
+2. Checks whether any of them are Active.
+3. If **all** matching groups are disabled -> it disables **its own group**.
+4. If **any** matching group is active -> it enables **its own group**.
+
+This allows groups to depend on other groups without wires, similar to rgthree repeaters.
+
+<details>
+<summary><b>Usage examples</b></summary>
+
+### Example 1 — enable your group if “MainFix” is active
+Filter: `MainFix`  
+If any "MainFix*" group is Active -> enable the current group.
+
+### Example 2 — auto-disable helper groups
+Filter: `Hands`  
+If all hand-related groups are muted -> disable current group too.
+
+</details>
+
+---
+
+# Installation
 
 From your ComfyUI root directory:
 

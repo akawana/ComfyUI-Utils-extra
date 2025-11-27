@@ -26,5 +26,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "AKSettingsOut": "AK Settings Out"
+    "AKSettingsOut": "AKSettings Out"
 }
