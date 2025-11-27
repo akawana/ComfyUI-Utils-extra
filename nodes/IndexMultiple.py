@@ -41,19 +41,29 @@ class IndexMultiple:
         start = max(0, int(starting_index[0] if isinstance(starting_index, (list, tuple)) else starting_index))
         length_val = max(1, min(50, int(length[0] if isinstance(length, (list, tuple)) else length)))
 
-        for i, v in enumerate(items[:10]):
-            print(f"  [{i}] {v}")
+#        for i, v in enumerate(items[:10]):
+#            print(f"  [{i}] {v}")
 
+        if isinstance(if_none, (list, tuple)):
+            fallback = if_none[0] if len(if_none) > 0 else None
+        else:
+            fallback = if_none
+
+        print(fallback)
         result = []
+
         for i in range(50):
             idx = start + i
-            if i < length_val and idx < len(items):
-                result.append(items[idx])
+
+            if i < length_val and 0 <= idx < len(items):
+                v = items[idx]
+                if v is None and fallback is not None:
+                    v = fallback
             else:
-                if if_none is not None:
-                    result.append(if_none[0])
-                else:
-                    result.append(None)
+                v = fallback
+
+            result.append(v)
+
 
         return tuple(result)
 
