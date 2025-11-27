@@ -54,7 +54,7 @@ If you ask for 5 outputs but receive only 2 items, the rest become `None`, or `i
 ---
 
 ## AKSampler Settings
-**Category:** `utils/sampler`  
+**Category:** `utils/settings`  
 **Class:** `AKSamplerSettings`
 
 A minimalistic node that stores three key sampler parameters:
@@ -72,7 +72,7 @@ It outputs them as a **LIST**, suitable for passing into:
 ---
 
 ## AKSettings Out
-**Category:** `utils/sampler`  
+**Category:** `utils/settings`  
 **Class:** `AKSettingsOut`
 
 Expands the LIST received from **AKSampler Settings** into three independent outputs:
@@ -86,7 +86,7 @@ Useful for distributing sampler parameters across multiple samplers or exposing 
 ---
 
 ## IsOneOfGroupsActive
-**Category:** `utils/groups`  
+**Category:** `utils/logic`  
 **Class:** `IsOneOfGroupsActive`
 
 Checks the state of all groups whose names **contain a specified substring**.  
@@ -105,7 +105,7 @@ If **all** matching groups are Muted/Bypassed -> output is `false`.
 ---
 
 ## RepeatGroupState
-**Category:** `utils/groups`  
+**Category:** `utils/logic`  
 **Class:** `RepeatGroupState`
 
 A connection-free node that synchronizes the state of its own group with the state of other groups matching a given substring.
