@@ -13,19 +13,19 @@ class AKSamplerSettings:
                     "max": 2**32 - 1,
                     "step": 1,
                 }),
-                "Denoise": ("FLOAT", {
-                    "default": 0.5,
-                    "min": 0.05,
-                    "max": 1.0,
-                    "step": 0.05,
-                    "round": 0.01,
-                }),
                 "Cfg": ("FLOAT", {
                     "default": 1.0,
                     "min": 0.5,
                     "max": 10.0,
                     "step": 0.5,
                     "round": 0.1,
+                }),
+                "Denoise": ("FLOAT", {
+                    "default": 0.5,
+                    "min": 0.05,
+                    "max": 1.0,
+                    "step": 0.05,
+                    "round": 0.01,
                 }),
             }
         }
@@ -35,10 +35,10 @@ class AKSamplerSettings:
     FUNCTION = "make_settings"
     CATEGORY = "utils/settings"
 
-    def make_settings(self, Seed, Denoise, Cfg):
-        Denoise = round(Denoise, 2)
+    def make_settings(self, Seed, Cfg, Denoise):
         Cfg = round(Cfg, 1)
-        return ([Seed, Denoise, Cfg],)
+        Denoise = round(Denoise, 2)
+        return ([Seed, Cfg, Denoise],)
 
 
 NODE_CLASS_MAPPINGS = {

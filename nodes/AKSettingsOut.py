@@ -8,17 +8,17 @@ class AKSettingsOut:
         }
 
     RETURN_TYPES = ("INT", "FLOAT", "FLOAT")
-    RETURN_NAMES = ("Seed", "Denoise", "Cfg")
+    RETURN_NAMES = ("Seed", "Cfg", "Denoise")
     FUNCTION = "output_settings"
     CATEGORY = "utils/settings"
 
     def output_settings(self, settings):
         # settings = [Seed, Denoise, Cfg]
         seed = settings[0] if len(settings) > 0 else 0
-        denoise = settings[1] if len(settings) > 1 else 0.0
-        cfg = settings[2] if len(settings) > 2 else 0.0
+        cfg = settings[1] if len(settings) > 2 else 0.0
+        denoise = settings[2] if len(settings) > 1 else 0.0
 
-        return (seed, denoise, cfg)
+        return (seed, cfg, denoise)
 
 
 NODE_CLASS_MAPPINGS = {
