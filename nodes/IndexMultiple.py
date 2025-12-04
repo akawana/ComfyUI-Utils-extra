@@ -49,7 +49,7 @@ class IndexMultiple:
         else:
             fallback = if_none
 
-        print(fallback)
+        # print(fallback)
         result = []
 
         for i in range(50):

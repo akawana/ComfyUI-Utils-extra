@@ -1,14 +1,21 @@
+## Other My Nodes
+
+### Utilities for working with Lists and toggling groups
+https://github.com/akawana/ComfyUI-Utils-extra
+
+### Extra shortcuts for editing texts and prompts + text splitting for Regional Prompts
+https://github.com/akawana/ComfyUI-Keybinding-extra
+
+### RGBYP 5-color mask editor
+https://github.com/akawana/ComfyUI-RGBYP-Mask-Editor
+
+---
+
 # ComfyUI-Utils-extra
 A compact collection of utility nodes for **ComfyUI** that I could not find in other node packs, but which I need in my production workflow.  
 They help automate repetitive tasks, relay group states, manage sampler parameters, and simplify work with lists.
 
 This repository will be gradually expanded with new practical utilities.
-
----
-
-## My other nodes
-**ComfyUI-Keybinding-extra**  
-https://github.com/akawana/ComfyUI-Keybinding-extra
 
 ---
 
