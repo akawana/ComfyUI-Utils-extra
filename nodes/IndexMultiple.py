@@ -69,5 +69,4 @@ class IndexMultiple:
 
 
 NODE_CLASS_MAPPINGS = {"IndexMultiple": IndexMultiple}
-NODE_DISPLAY_NAME_MAPPINGS = {"Index Multiple": "Index Multiple"}
-#__all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
+NODE_DISPLAY_NAME_MAPPINGS = {"IndexMultiple": "Index Multiple"}
