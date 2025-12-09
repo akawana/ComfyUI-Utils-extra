@@ -3,6 +3,9 @@ WEB_DIRECTORY = "./js"
 from .nodes.IndexMultiple import NODE_CLASS_MAPPINGS as INDEX_MAPPINGS
 from .nodes.IndexMultiple import NODE_DISPLAY_NAME_MAPPINGS as INDEX_DISPLAY
 
+from .nodes.CLIPEncodeMultiple import NODE_CLASS_MAPPINGS as CLIP_MAPPINGS
+from .nodes.CLIPEncodeMultiple import NODE_DISPLAY_NAME_MAPPINGS as CLIP_DISPLAY
+
 from .nodes.AKSamplerSettings import NODE_CLASS_MAPPINGS as AKS_MAPPINGS
 from .nodes.AKSamplerSettings import NODE_DISPLAY_NAME_MAPPINGS as AKS_DISPLAY
 
@@ -20,6 +23,7 @@ from .nodes.PreviewRawText import NODE_DISPLAY_NAME_MAPPINGS as PRTSTATE_DISPLAY
 
 NODE_CLASS_MAPPINGS = {
     **INDEX_MAPPINGS,
+    **CLIP_MAPPINGS,
     **AKS_MAPPINGS,
     **AKOUT_MAPPINGS,
     **GROUPCHK_MAPPINGS,
@@ -29,6 +33,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     **INDEX_DISPLAY,
+    **CLIP_DISPLAY,
     **AKS_DISPLAY,
     **AKOUT_DISPLAY,
     **GROUPCHK_DISPLAY,
