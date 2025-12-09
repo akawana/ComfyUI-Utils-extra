@@ -26,7 +26,7 @@ class CLIPEncodeMultiple:
     RETURN_NAMES = tuple(f"item_{i}" for i in range(50))
 
     FUNCTION = "execute"
-    CATEGORY = "utils/list"
+    CATEGORY = "conditioning"
     OUTPUT_NODE = True
 
     INPUT_IS_LIST = True

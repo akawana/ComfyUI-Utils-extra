@@ -63,7 +63,13 @@ If you ask for 5 outputs but receive only 2 items, the rest become `None`, or `i
 </details>
 
 ---
+## CLIP Encode Multiple
+**Category:** `conditioning`  
 
+Extracts a specific range from any **List** or **Batch** of STINGs and CLIP encodes individual outputs for that range.  
+Same as Index Multiple but for CLIP encoding. Works faster than regular CLIP Encoders because does only one encoding for all NONE input strings.
+
+---
 ## AKSampler Settings
 **Category:** `utils/settings`  
 
