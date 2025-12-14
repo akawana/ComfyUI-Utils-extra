@@ -19,12 +19,12 @@ app.registerExtension({
 
             while (node.outputs.length < currentLength) {
                 const idx = node.outputs.length;
-                node.addOutput(`item_${idx}`, "*");
+                node.addOutput(`cond_${idx}`, "*");
             }
 
             for (let i = 0; i < node.outputs.length; i++) {
-                node.outputs[i].name = `item_${i}`;
-                node.outputs[i].label = `item_${i}`;
+                node.outputs[i].name = `cond_${i}`;
+                node.outputs[i].label = `cond_${i}`;
             }
 
             node.setSize(node.computeSize());

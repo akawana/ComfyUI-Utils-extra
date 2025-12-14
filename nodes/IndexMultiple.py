@@ -25,7 +25,7 @@ class IndexMultiple:
 
     FUNCTION = "execute"
     CATEGORY = "utils/list"
-    OUTPUT_NODE = True
+    OUTPUT_NODE = False
 
     INPUT_IS_LIST = True
 

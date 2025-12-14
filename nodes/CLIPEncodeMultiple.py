@@ -23,11 +23,11 @@ class CLIPEncodeMultiple:
         }
 
     RETURN_TYPES = ("CONDITIONING",) * 50
-    RETURN_NAMES = tuple(f"item_{i}" for i in range(50))
+    RETURN_NAMES = tuple(f"cond_{i}" for i in range(50))
 
     FUNCTION = "execute"
     CATEGORY = "conditioning"
-    OUTPUT_NODE = True
+    OUTPUT_NODE = False
 
     INPUT_IS_LIST = True
 
