@@ -11,7 +11,7 @@ class IndexMultiple:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "input_any": (ANY_TYPE, {"forceInput": True}),
+                "input_any": (ANY_TYPE, {"forceInput": False}),
                 "starting_index": ("INT", {"default": 0, "min": 0, "step": 1}),
                 "length": ("INT", {"default": 1, "min": 1, "max": 50, "step": 1}),
             },

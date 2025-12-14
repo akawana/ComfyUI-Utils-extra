@@ -1,16 +1,18 @@
 ## Other My Nodes
 
-Utilities for working with Lists and toggling groups
+Utilities for working with Lists, Regions, Toggling groups, Caching conditions: [ComfyUI Utils Extra](https://github.com/akawana/ComfyUI-Utils-extra)
 
-https://github.com/akawana/ComfyUI-Utils-extra
+Folding of promts in to tree with extra features. Extra shortcuts for editing prompts. Reginal prompting text separation: [ComfyUI Folded Prompts](https://github.com/akawana/ComfyUI-Folded-Prompts)
 
-Folding of promts in to tree with extra features. Extra shortcuts for editing prompts. Reginal prompting text separation.
+RGBYP 5-color mask editor: [ComfyUI RGBYP Mask Editor](https://github.com/akawana/ComfyUI-RGBYP-Mask-Editor)
 
-https://github.com/akawana/ComfyUI-Folded-Prompts
+---
 
-RGBYP 5-color mask editor
+## Version changes
 
-https://github.com/akawana/ComfyUI-RGBYP-Mask-Editor
+**V 3.00**
+
+**CLIP Text Encode Cached** node. I highly recommend using it together with **FPFoldedPrompts** and **FPTextAreaPlus** from [ComfyUI Folded Prompts](https://github.com/akawana/ComfyUI-Folded-Prompts) pack!
 
 ---
 
@@ -67,7 +69,16 @@ If you ask for 5 outputs but receive only 2 items, the rest become `None`, or `i
 **Category:** `conditioning`  
 
 Extracts a specific range from any **List** or **Batch** of STINGs and CLIP encodes individual outputs for that range.  
+
 Same as Index Multiple but for CLIP encoding. Works faster than regular CLIP Encoders because does only one encoding for all NONE input strings.
+
+Starting from v3+ caches the stings and does not encode them if no changes.
+
+---
+## CLIP Text Encode Cached
+**Category:** `conditioning`  
+
+This node can cache the previous CONDITIONING and avoids re-encoding. Unfortunately, ComfyUI is designed in such a way that if you change anything in **FPFoldedPrompts** or **FPTextAreaPlus** of [ComfyUI Folded Prompts](https://github.com/akawana/ComfyUI-Folded-Prompts) pack, the encode step will always be triggered. However, you often change text inside the `<ARn>` tags, and this should not cause a re-encode of the main text.
 
 ---
 ## AKSampler Settings

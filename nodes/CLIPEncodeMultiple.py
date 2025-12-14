@@ -9,21 +9,22 @@ ANY_TYPE = AnyType("*")
 
 class CLIPEncodeMultiple:
     empty_cache = {}
+    text_cache = {}
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "input_any": (ANY_TYPE, {"forceInput": True}),
+                "input_any": (ANY_TYPE, {"forceInput": False}),
                 "clip": ("CLIP",),
                 "starting_index": ("INT", {"default": 0, "min": 0, "step": 1}),
-                "length": ("INT", {"default": 1, "min": 1, "max": 50, "step": 1}),
+                "length": ("INT", {"default": 1, "min": 1, "max": 20, "step": 1}),
             },
             "optional": {}
         }
 
-    RETURN_TYPES = ("CONDITIONING",) * 50
-    RETURN_NAMES = tuple(f"cond_{i}" for i in range(50))
+    RETURN_TYPES = ("CONDITIONING",) * 20
+    RETURN_NAMES = tuple(f"cond_{i}" for i in range(20))
 
     FUNCTION = "execute"
     CATEGORY = "conditioning"
@@ -46,9 +47,42 @@ class CLIPEncodeMultiple:
 
     @classmethod
     def _encode_text(cls, clip, text):
+        # norm = text.replace("\r\n", "\n")
+        key = (id(clip), hash(text))
+        # key = hash(text.replace("\r\n", "\n"))
+        # key = (cls._clip_key(clip), text)
+
+        # print("[enc] key=", key, "len=", len(text), "tail=", repr(text))
+
+        cached = cls.text_cache.get(key)
+        if cached is not None:
+            # print("[enc] HIT")
+            return cached
+
         tokens = clip.tokenize(text)
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
-        return [[cond, {"pooled_output": pooled}]]
+        out = [[cond, {"pooled_output": pooled}]]
+
+        cls.text_cache[key] = out
+        return out
+
+    @staticmethod
+    def _clip_key(clip):
+        # в comfy CLIP часто есть cond_stage_model — он стабильнее, чем wrapper
+        inner = getattr(clip, "cond_stage_model", None)
+        if inner is not None:
+            return id(inner)
+        # иногда есть .clip или .model
+        inner = getattr(clip, "clip", None) or getattr(clip, "model", None)
+        if inner is not None:
+            return id(inner)
+        return id(clip)
+
+    # @classmethod
+    # def _encode_text(cls, clip, text):
+    #     tokens = clip.tokenize(text)
+    #     cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
+    #     return [[cond, {"pooled_output": pooled}]]
 
     def execute(self, clip, input_any, starting_index, length):
         # Unwrap list inputs when INPUT_IS_LIST is True
@@ -84,15 +118,16 @@ class CLIPEncodeMultiple:
             length_raw = length
 
         start = max(0, int(start_raw))
-        length_val = max(1, min(50, int(length_raw)))
+        length_val = max(1, min(20, int(length_raw)))
 
         result = []
         empty_cond = None
 
-        for i in range(50):
+        # encode 
+        for i in range(length_val):
             idx = start + i
 
-            if i < length_val and 0 <= idx < len(items):
+            if 0 <= idx < len(items):
                 v = items[idx]
                 if v is None:
                     if empty_cond is None:
@@ -104,6 +139,9 @@ class CLIPEncodeMultiple:
                 cond = None
 
             result.append(cond)
+
+        if length_val < 20:
+            result.extend([None] * (20 - length_val))
 
         return tuple(result)
 
