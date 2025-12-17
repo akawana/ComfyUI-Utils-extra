@@ -33,7 +33,7 @@ class AKSamplerSettings:
     RETURN_TYPES = ("LIST",)
     RETURN_NAMES = ("settings",)
     FUNCTION = "make_settings"
-    CATEGORY = "utils/settings"
+    CATEGORY = "AK/settings"
 
     def make_settings(self, Seed, Cfg, Denoise):
         Cfg = round(Cfg, 1)

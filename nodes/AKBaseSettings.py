@@ -1,0 +1,68 @@
+import json
+import comfy.samplers
+
+
+class AKBaseSettings:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "output_folder": ("STRING", {"default": ""}),
+                "width": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 1}),
+                "height": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 1}),
+                "sampler_name": (comfy.samplers.SAMPLER_NAMES, {"default": comfy.samplers.SAMPLER_NAMES[0]}),
+                "scheduler": (comfy.samplers.SCHEDULER_NAMES, {"default": comfy.samplers.SCHEDULER_NAMES[0]}),
+                "seed": ("INT", {"default": 0, "min": -2147483648, "max": 2147483647, "step": 1}),
+                "cfg": ("FLOAT", {"default": 7.0, "min": 0.0, "max": 100.0, "step": 0.1}),
+                "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "xy_variations": ("INT", {"default": 1, "min": 1, "max": 9999, "step": 1}),
+            },
+            "hidden": {
+                "node_id": "UNIQUE_ID",
+            },
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("ak_base_settings",)
+    FUNCTION = "run"
+    CATEGORY = "AK/_testing_"
+
+    def run(
+        self,
+        output_folder: str,
+        width: int,
+        height: int,
+        sampler_name: str,
+        scheduler: str,
+        seed: int,
+        cfg: float,
+        denoise: float,
+        xy_variations: int,
+        node_id=None,
+    ):
+        from_id = str(node_id) if node_id is not None else ""
+        s = json.dumps(
+            {
+                "output_folder": str(output_folder),
+                "width": int(width),
+                "height": int(height),
+                "sampler_name": str(sampler_name),
+                "scheduler": str(scheduler),
+                "seed": int(seed),
+                "cfg": float(cfg),
+                "denoise": float(denoise),
+                "xy_variations": int(xy_variations),
+                "from_id": from_id,
+            },
+            ensure_ascii=False,
+        )
+        return (s,)
+
+
+NODE_CLASS_MAPPINGS = {
+    "AK Base Settings": AKBaseSettings,
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "AK Base Settings": "AK Base Settings",
+}

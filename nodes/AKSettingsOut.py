@@ -10,7 +10,7 @@ class AKSettingsOut:
     RETURN_TYPES = ("INT", "FLOAT", "FLOAT")
     RETURN_NAMES = ("Seed", "Cfg", "Denoise")
     FUNCTION = "output_settings"
-    CATEGORY = "utils/settings"
+    CATEGORY = "AK/settings"
 
     def output_settings(self, settings):
         # settings = [Seed, Denoise, Cfg]

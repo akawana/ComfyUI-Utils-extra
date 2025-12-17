@@ -1,0 +1,311 @@
+import { app } from "/scripts/app.js";
+import { previewRect, backButtonRect } from "./AKBase_ui.js";
+import { fetchTempJson, buildTempViewUrl, loadImageFromUrl, readPngTextChunks } from "./AKBase_io.js";
+
+export function installInputHandlers(node) {
+  const state = node._akBase;
+  if (!state) return;
+
+  async function setConnectedNodeValue(seedIn) {
+    try {
+      console.log("[AKBase] setConnectedNodeValue called with seed:", seedIn);
+
+      const nid = node?.id;
+      console.log("[AKBase] current node id:", nid);
+      if (nid === undefined || nid === null) {
+        console.log("[AKBase] node id is missing");
+        return;
+      }
+
+      const fn = `ak_base_settings_${nid}.json`;
+      console.log("[AKBase] loading settings json:", fn);
+      const cfg = await fetchTempJson(fn);
+      console.log("[AKBase] loaded settings json:", cfg);
+
+      const fromId = cfg?.from_id;
+      console.log("[AKBase] from_id:", fromId);
+      if (fromId === undefined || fromId === null) {
+        console.log("[AKBase] from_id not found in json");
+        return;
+      }
+
+      const targetId = Number(fromId);
+      if (!Number.isFinite(targetId)) {
+        console.log("[AKBase] from_id is not a valid number:", fromId);
+        return;
+      }
+
+      const targetNode = app?.graph?.getNodeById?.(targetId);
+      console.log("[AKBase] target node:", targetNode);
+      if (!targetNode) {
+        console.log("[AKBase] target node not found in graph");
+        return;
+      }
+
+      const w = targetNode.widgets?.find(w => w?.name === "seed");
+      console.log("[AKBase] target seed widget:", w);
+      if (!w) {
+        console.log("[AKBase] seed widget not found on target node");
+        return;
+      }
+
+      w.value = Number(seedIn);
+      console.log("[AKBase] seed widget value set to:", w.value);
+
+      try {
+        targetNode.onWidgetChanged?.(w.name, w.value, w);
+        console.log("[AKBase] onWidgetChanged called");
+      } catch (e) {
+        console.log("[AKBase] onWidgetChanged error:", e);
+      }
+
+      const w2 = targetNode.widgets?.find(w => w?.name === "xy_variations");
+      if (w2) {
+        w2.value = 1;
+        try { targetNode.onWidgetChanged?.(w2.name, w2.value, w2); } catch (_) { }
+      }
+
+
+      try {
+        targetNode.setDirtyCanvas?.(true, true);
+      } catch (_) { }
+
+      app.graph.setDirtyCanvas(true, true);
+      console.log("[AKBase] canvas marked dirty, done");
+    } catch (e) {
+      console.log("[AKBase] setConnectedNodeValue exception:", e);
+    }
+  }
+
+  async function getPropertiesFromImage(imageNumber) {
+    console.log("[AKBase] getPropertiesFromImage", { imageNumber });
+    try {
+      const idx = Number(imageNumber);
+
+      const url = state?.gallery?.urls?.[idx] || null;
+      if (url) {
+        const chunks = await readPngTextChunks(url);
+
+        let metaObj = null;
+        let seedVal = null;
+
+        for (const c of chunks) {
+          if (!c || !c.key) continue;
+
+          if (c.key === "ak_meta") {
+            try { metaObj = JSON.parse(String(c.val ?? "{}")); } catch (_) { metaObj = null; }
+          }
+
+          if (c.key === "seed") {
+            const v = Number(c.val);
+            if (Number.isFinite(v)) seedVal = v;
+          }
+        }
+
+        if (metaObj && typeof metaObj === "object") {
+          const xName = String(metaObj?.x_parameter_name_0 ?? "").toLowerCase();
+          const zName = String(metaObj?.z_parameter_name_0 ?? "").toLowerCase();
+
+          if (xName === "seed") {
+            const v = Number(metaObj?.x_parameter_value_0);
+            if (Number.isFinite(v)) seedVal = v;
+          } else if (zName === "seed") {
+            const v = Number(metaObj?.z_parameter_value_0);
+            if (Number.isFinite(v)) seedVal = v;
+          } else {
+            const v = Number(metaObj?.seed);
+            if (Number.isFinite(v)) seedVal = v;
+          }
+        }
+
+        if (seedVal !== null && seedVal !== undefined) {
+          console.log("[AKBase] seed extracted from png meta:", seedVal);
+          await setConnectedNodeValue(seedVal);
+          return true;
+        }
+      }
+
+      const nid = node?.id;
+      if (nid === undefined || nid === null) return false;
+
+      const cfgFn = `ak_base_xz_config_${nid}.json`;
+      const cfg = await fetchTempJson(cfgFn);
+      const images = cfg?.image;
+      if (!Array.isArray(images)) return false;
+
+      const it = images[idx];
+      if (!it || typeof it !== "object") return false;
+
+      const xName = String(it?.x_parameter_name_0 ?? "").toLowerCase();
+      const zName = String(it?.z_parameter_name_0 ?? "").toLowerCase();
+
+      const isSeed = (xName === "seed") || (zName === "seed");
+      if (!isSeed) return false;
+
+      const seedVal = (xName === "seed") ? it?.x_parameter_value_0 : it?.z_parameter_value_0;
+      if (seedVal === undefined || seedVal === null) return false;
+
+      console.log("[AKBase] seed extracted:", seedVal);
+      await setConnectedNodeValue(seedVal);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function setPreviewImage(imageNumber) {
+    const g = state.gallery;
+    const imgs = g?.images ?? [];
+    const idx = Number(imageNumber);
+
+    if (!imgs.length) return;
+
+    const bImg = (idx >= 0 && idx < imgs.length) ? imgs[idx] : null;
+    if (!bImg) return;
+
+    const nid = node?.id;
+    if (nid === undefined || nid === null) return;
+
+    const aFn = `ak_base_image_a_${nid}.png`;
+    const aUrl = buildTempViewUrl(aFn);
+
+    let aImg = null;
+    try {
+      aImg = await loadImageFromUrl(aUrl);
+    } catch (_) {
+      return;
+    }
+
+    state.mode = "compare";
+
+    state.a.img = aImg;
+    state.a.loaded = true;
+    state.a.url = null;
+
+    state.b.img = bImg;
+    state.b.loaded = true;
+    state.b.url = null;
+
+    state.gallery.images = [];
+    state.gallery.urls = [];
+    state.gallery.hoverIndex = -1;
+
+    state.inPreview = true;
+    state.hover = true;
+    state.cursorX = 0.5;
+
+    node?._akBase?.updateBackBtn?.();
+    app.graph.setDirtyCanvas(true, true);
+  }
+
+  node.onMouseMove = function (e, pos) {
+    let localX = pos[0];
+    let localY = pos[1];
+    if (localX > this.size[0] || localY > this.size[1] || localX < 0 || localY < 0) {
+      localX = pos[0] - this.pos[0];
+      localY = pos[1] - this.pos[1];
+    }
+
+    const r = previewRect(this);
+    const inside = localX >= r.x && localX <= r.x + r.w && localY >= r.y && localY <= r.y + r.h;
+
+    state.inPreview = inside;
+    state.hover = inside;
+
+    if (!inside) {
+      if (state.mode === "gallery") state.gallery.hoverIndex = -1;
+      return;
+    }
+
+    if (state.mode === "gallery") {
+      const g = state.gallery;
+      const grid = g?.grid;
+      const N = g?.images?.length ?? 0;
+      if (!grid || !N) return;
+
+      const x = localX - r.x;
+      const y = localY - r.y;
+
+      const col = Math.floor(x / grid.cellW);
+      const row = Math.floor(y / grid.cellH);
+      const idx = row * grid.cols + col;
+
+      g.hoverIndex = (idx >= 0 && idx < N) ? idx : -1;
+      app.graph.setDirtyCanvas(true, true);
+      return;
+    }
+
+    if (r.w > 0) {
+      state.cursorX = Math.min(1, Math.max(0, (localX - r.x) / r.w));
+      app.graph.setDirtyCanvas(true, true);
+    }
+  };
+
+
+  node.onMouseDown = function (e, pos) {
+    console.log("[AKBase] onMouseDown", { mode: state.mode, pos });
+
+    let localX = pos[0];
+    let localY = pos[1];
+    if (localX > this.size[0] || localY > this.size[1] || localX < 0 || localY < 0) {
+      localX = pos[0] - this.pos[0];
+      localY = pos[1] - this.pos[1];
+    }
+
+    const btn = backButtonRect(this);
+    const insideBtn = localX >= btn.x && localX <= btn.x + btn.w && localY >= btn.y && localY <= btn.y + btn.h;
+    if (insideBtn) {
+      const enabled = (state.mode === "compare") && !!state.hasGallery;
+      console.log("[AKBase] back button click", { enabled });
+      if (enabled) {
+        (async () => { await state.backToGallery?.(); })();
+      }
+      return true;
+    }
+
+    if (state.mode !== "gallery") return false;
+
+    const r = previewRect(this);
+    const inside = localX >= r.x && localX <= r.x + r.w && localY >= r.y && localY <= r.y + r.h;
+    console.log("[AKBase] click inside preview:", inside);
+
+    if (!inside) return false;
+
+    const g = state.gallery;
+    const grid = g?.grid;
+    const N = g?.images?.length ?? 0;
+
+    if (!grid || !N) {
+      console.log("[AKBase] gallery grid/images missing", { hasGrid: !!grid, N });
+      return false;
+    }
+
+    const x = localX - r.x;
+    const y = localY - r.y;
+
+    const col = Math.floor(x / grid.cellW);
+    const row = Math.floor(y / grid.cellH);
+    const idx = row * grid.cols + col;
+
+    console.log("[AKBase] computed gallery index:", idx, { row, col, cols: grid.cols, cellW: grid.cellW, cellH: grid.cellH, N });
+
+    if (!(idx >= 0 && idx < N)) return false;
+
+    g.hoverIndex = idx;
+
+    (async () => {
+      const ok = await getPropertiesFromImage(idx);
+      console.log("[AKBase] getPropertiesFromImage result:", ok);
+      if (ok) await setPreviewImage(idx);
+    })();
+
+    return true;
+  };
+
+  node.onMouseLeave = function () {
+    state.hover = false;
+    state.inPreview = false;
+    if (state.mode === "gallery") state.gallery.hoverIndex = -1;
+    app.graph.setDirtyCanvas(true, true);
+  };
+}

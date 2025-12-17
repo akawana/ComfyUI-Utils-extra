@@ -7,7 +7,11 @@ const SILENT_FILES = [
     "IndexMultiple.js",
     "IsOneOfGroupsActive.js",
     "PreviewRawText.js",
-    "RepeatGroupState.js"
+    "RepeatGroupState.js",
+    "AKBase.js",
+    "AKBase_io.js",
+    "AKBase_input.js",
+    "AKBase_ui.js"
 ];
 
 console.log = function (...args) {
