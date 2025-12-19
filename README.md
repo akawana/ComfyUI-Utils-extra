@@ -12,6 +12,10 @@ AK XZ Axis so called XY testing for any type of KSampler: [ComfyUI AK XZ Axis](h
 
 ## Version changes
 
+**V 3.01**
+
+**AK Pipe** Max speed pipe node. Read the description below. 
+
 **V 3.00**
 
 **CLIP Text Encode Cached** node. I highly recommend using it together with **FPFoldedPrompts** and **FPTextAreaPlus** from [ComfyUI Folded Prompts](https://github.com/akawana/ComfyUI-Folded-Prompts) pack!
@@ -29,6 +33,11 @@ This repository will be gradually expanded with new practical utilities.
 # Nodes Overview
 
 ---
+## AK Pipe
+
+AK Pipe is a zero-copy pipeline node that passes a structured pipe object through the graph and updates only explicitly connected inputs. It avoids unnecessary allocations by reusing the original pipe when no values change and creates a new container only on real object replacement.
+
+This design minimizes memory churn and Python overhead, making it significantly faster than traditional pipe merge nodes.
 
 ## Index Multiple
 **Category:** `utils/list`  
