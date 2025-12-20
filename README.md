@@ -12,6 +12,10 @@ AK XZ Axis so called XY testing for any type of KSampler: [ComfyUI AK XZ Axis](h
 
 ## Version changes
 
+**V 3.05**
+
+**Getter & Setter** These nodes already exist in several other packs. My goal was to make them faster.
+
 **V 3.01**
 
 **AK Pipe** Max speed pipe node. Read the description below. 
@@ -42,6 +46,14 @@ AK Pipe is a zero-copy pipeline node that passes a structured pipe object throug
 
 This design minimizes memory churn and Python overhead, making it significantly faster than traditional pipe merge nodes.
 
+---
+## Setter & Getter
+
+These nodes already exist in several other packs. My goal was to make them faster. In my implementation, the nodes do not use JavaScript to store or pass data. All data is passed only through Python and direct connections between nodes. Simply put, they hide links and hide outputs and inputs. 
+
+In my setup, JavaScript is responsible only for updating the list of variables and does not affect the Run process in any way. Based on my comparisons, in complex workflows with 20–30 Getter/Setter nodes, my nodes perform much faster.
+
+---
 ## Index Multiple
 **Category:** `utils/list`  
 
