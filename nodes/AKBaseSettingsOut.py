@@ -12,11 +12,12 @@ class AKBaseSettingsOut:
         }
 
     # RETURN_TYPES = ("STRING", "INT", "INT", comfy.samplers.SAMPLER_NAMES, comfy.samplers.SCHEDULER_NAMES, "INT", "FLOAT", "FLOAT", "INT")
-    RETURN_TYPES = ("STRING", "INT", "INT", comfy.samplers.SAMPLER_NAMES, comfy.samplers.SCHEDULER_NAMES, "INT", "FLOAT", "FLOAT", "INT")
+    RETURN_TYPES = ("STRING", "INT", "INT", "BOOLEAN", comfy.samplers.SAMPLER_NAMES, comfy.samplers.SCHEDULER_NAMES, "INT", "FLOAT", "FLOAT", "INT")
     RETURN_NAMES = (
         "output_folder",
         "width",
         "heigth",
+        "do_resize",
         "sampler_name",
         "scheduler",
         "seed",
@@ -40,6 +41,7 @@ class AKBaseSettingsOut:
         output_folder = str(data.get("output_folder", ""))
         width = int(data.get("width", 0) or 0)
         heigth = int(data.get("height", data.get("heigth", 0)) or 0)
+        do_resize = bool(data.get("do_resize", True))
         # sampler_name = [str(data.get("sampler_name", "euler"))]
         # scheduler = [str(data.get("scheduler", "normal"))]
         sampler_name = comfy.samplers.SAMPLER_NAMES.insert(0, str(data.get("sampler_name", "euler")))
@@ -49,7 +51,7 @@ class AKBaseSettingsOut:
         denoise = float(data.get("denoise", 0.0) or 0.0)
         xy_variations = int(data.get("xy_variations", 0) or 0)
 
-        return (output_folder, width, heigth, sampler_name, scheduler, seed, cfg, denoise, xy_variations)
+        return (output_folder, width, heigth, do_resize, sampler_name, scheduler, seed, cfg, denoise, xy_variations)
 
 
 NODE_CLASS_MAPPINGS = {

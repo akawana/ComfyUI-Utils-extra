@@ -21,7 +21,7 @@ app.registerExtension({
     const onCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
       const r = onCreated?.apply(this, arguments);
-      addSpacer(this, "height");
+      addSpacer(this, "do_resize");
       addSpacer(this, "scheduler");
       addSpacer(this, "denoise");
       return r;
