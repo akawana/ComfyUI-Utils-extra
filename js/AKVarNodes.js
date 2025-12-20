@@ -30,7 +30,6 @@ function _clearChangedNameLater(token) {
 function _isGetterNode(node) {
   if (!node) return false;
   if (node.type === "Getter") return true;
-  if (node.title === "Getter") return true;
   try {
     const ins = node.inputs || [];
     const outs = node.outputs || [];
@@ -44,7 +43,6 @@ function _isGetterNode(node) {
 function _isSetterNode(node) {
   if (!node) return false;
   if (node.type === "Setter") return true;
-  if (node.title === "Setter") return true;
   try {
     const outs = node.outputs || [];
     const hasOut = outs.some(x => x && x.name === "OUT");
@@ -77,8 +75,8 @@ function _syncNodeTitleToVarName(node) {
     // const base = (node.type === "Setter" || node.title === "Setter") ? "Setter" : ((node.type === "Getter" || node.title === "Getter") ? "Getter" : (node.title || ""));
     // const newTitle = base ? (base + ": " + v) : v;
     let prefix = "";
-    if (node.type === "Setter" || node.title === "Setter") prefix = "🔽 ";
-    else if (node.type === "Getter" || node.title === "Getter") prefix = "🔼 ";    
+    if (node.type === "Setter") prefix = "🔽 ";
+    else if (node.type === "Getter") prefix = "🔼 ";    
     const newTitle = prefix + v;
     if (node.title !== newTitle) {
       node.title = newTitle;

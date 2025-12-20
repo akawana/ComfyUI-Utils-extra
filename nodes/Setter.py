@@ -122,7 +122,8 @@ class Setter:
             st.values_by_name[name] = None
             bisect.insort(st.names_sorted, name)
 
-        value = obj[0] if isinstance(obj, (list, tuple)) else obj
+        # value = obj[0] if isinstance(obj, (list, tuple)) else obj
+        value = obj
         st.values_by_name[name] = value
         return (value,)
 

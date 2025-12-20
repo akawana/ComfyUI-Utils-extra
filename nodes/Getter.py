@@ -26,7 +26,7 @@ class Getter:
 
     def get(self, inp=None, var_name="", unique_id=None):
         if inp is None:
-            raise Exception(f"[Getter {unique_id}] inp is not connected")
+            raise Exception(f"[Getter {unique_id} {var_name}] inp is not connected")
         return (inp,)
 
 
