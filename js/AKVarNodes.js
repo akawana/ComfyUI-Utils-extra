@@ -202,6 +202,8 @@ function hookSetter(node) {
   if (!node || node._akVarSetterHooked) return;
   node._akVarSetterHooked = true;
 
+  _disableVarNameInputConnections(node);
+
   const w = getWidget(node, "var_name");
   if (!w || w._akVarHooked) return;
   w._akVarHooked = true;
@@ -212,18 +214,44 @@ function hookSetter(node) {
   w.callback = function (v) {
     const r = prevCb ? prevCb.call(this, v) : undefined;
 
-const nv = (typeof w.value === "string") ? w.value : "";
-if (nv !== w._akPrev) {
-  const ov = w._akPrev;
-  w._akPrev = nv;
-  const token = _setChangedName(ov, nv, node.id);
-  try { updateCombos(app.graph, true); } catch (_) { }
-  _clearChangedNameLater(token);
-}
+    const nv = (typeof w.value === "string") ? w.value : "";
+    if (nv !== w._akPrev) {
+      const ov = w._akPrev;
+      w._akPrev = nv;
+      const token = _setChangedName(ov, nv, node.id);
+      try { updateCombos(app.graph, true); } catch (_) { }
+      _clearChangedNameLater(token);
+    }
 
     return r;
   };
 }
+
+function _disableVarNameInputConnections(node) {
+  if (!node || node._akVarNoConnectVarName) return;
+  node._akVarNoConnectVarName = true;
+
+  const prev = node.onConnectInput;
+  node.onConnectInput = function (inputIndex, outputType, outputSlot, outputNode, outputIndex) {
+    try {
+      const inp = this.inputs && this.inputs[inputIndex];
+      if (inp && inp.name === "var_name") return false;
+    } catch (_) { }
+    return prev ? prev.call(this, inputIndex, outputType, outputSlot, outputNode, outputIndex) : true;
+  };
+
+  try {
+    if (Array.isArray(node.inputs)) {
+      for (let i = 0; i < node.inputs.length; i++) {
+        const inp = node.inputs[i];
+        if (inp && inp.name === "var_name" && inp.link != null) {
+          node.disconnectInput(i);
+        }
+      }
+    }
+  } catch (_) { }
+}
+
 
 function initGetterOverrider(node) {
   if (!node || node._akVarComboInit) return;
@@ -250,7 +278,7 @@ function _updateGetterOutputName(getterNode) {
   if (!getterNode || !Array.isArray(getterNode.outputs) || getterNode.outputs.length < 1) return;
 
   let varName = "";
-  try { varName = getterNode.properties?.var_name || ""; } catch (_) {}
+  try { varName = getterNode.properties?.var_name || ""; } catch (_) { }
 
   const out0 = getterNode.outputs[0];
   if (!out0) return;
@@ -269,12 +297,12 @@ function _updateGetterOutputName(getterNode) {
       const sz = getterNode.computeSize();
       if (sz && sz[0] && sz[1]) getterNode.setSize(sz);
     }
-  } catch (_) {}
+  } catch (_) { }
 
   try {
     if (globalThis.app?.graph?.setDirtyCanvas) globalThis.app.graph.setDirtyCanvas(true, true);
     if (globalThis.app?.canvas?.setDirty) globalThis.app.canvas.setDirty(true, true);
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function _applyChangedNameIfNeeded(getterNode) {
@@ -530,6 +558,7 @@ app.registerExtension({
     if (!node) return;
 
     if (node.type === "Setter") {
+      _installHideSocketsPatch();
       hookSetter(node);
       try { updateCombos(app.graph, true); } catch (_) { }
       return;
@@ -559,7 +588,11 @@ app.registerExtension({
 
   async loadedGraphNode(node) {
     if (!node) return;
-    if (node.type === "Setter") hookSetter(node);
+    if (node.type === "Setter") {
+      _installHideSocketsPatch();
+      hookSetter(node);
+
+    }
     if (node.type === "Getter" || node.type === "Overrider") initGetterOverrider(node);
     if (node.type === "Getter") {
       hookGetter(node);
