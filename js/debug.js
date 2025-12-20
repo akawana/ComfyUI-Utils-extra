@@ -12,7 +12,8 @@ const SILENT_FILES = [
     "AKBase.js",
     "AKBase_io.js",
     "AKBase_input.js",
-    "AKBase_ui.js"
+    "AKBase_ui.js",
+    "AKVarNodes.js"
 ];
 
 console.log = function (...args) {
