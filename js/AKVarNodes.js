@@ -69,6 +69,58 @@ function _readNodeVarName(node) {
   return "";
 }
 
+function _syncNodeTitleToVarName(node) {
+  try {
+    if (!node) return;
+    const v = _readNodeVarName(node);
+    if (!v) return;
+    // const base = (node.type === "Setter" || node.title === "Setter") ? "Setter" : ((node.type === "Getter" || node.title === "Getter") ? "Getter" : (node.title || ""));
+    // const newTitle = base ? (base + ": " + v) : v;
+    let prefix = "";
+    if (node.type === "Setter" || node.title === "Setter") prefix = "🔽 ";
+    else if (node.type === "Getter" || node.title === "Getter") prefix = "🔼 ";    
+    const newTitle = prefix + v;
+    if (node.title !== newTitle) {
+      node.title = newTitle;
+      try {
+        if (typeof node.setSize === "function" && typeof node.computeSize === "function") {
+          const sz = node.computeSize();
+          if (sz && sz[0] && sz[1]) node.setSize(sz);
+        }
+      } catch (_) { }
+      try {
+        if (globalThis.app?.graph?.setDirtyCanvas) globalThis.app.graph.setDirtyCanvas(true, true);
+        if (globalThis.app?.canvas?.setDirty) globalThis.app.canvas.setDirty(true, true);
+      } catch (_) { }
+    }
+  } catch (_) { }
+}
+
+function _colorizeSetterGetterNodes() {
+  try {
+    const g = globalThis.app?.graph;
+    if (!g || !Array.isArray(g._nodes)) return;
+
+    for (const node of g._nodes) {
+      if (!node) continue;
+
+      if (node.type === "Setter") {
+        node.color = "#333355";       // blue
+        node.bgcolor = "#222233";
+      } else if (node.type === "Getter") {
+        node.color = "#335533";       // green
+        node.bgcolor = "#223322";
+      }
+    }
+
+    try {
+      if (g.setDirtyCanvas) g.setDirtyCanvas(true, true);
+      if (globalThis.app?.canvas?.setDirty) globalThis.app.canvas.setDirty(true, true);
+    } catch (_) {}
+  } catch (_) {}
+}
+
+
 function collectSetterNames(graph) {
   const nodes = graph?._nodes;
   if (!nodes) return [];
@@ -176,6 +228,8 @@ function applyNamesToNode(node, names) {
 
   try { _updateGetterOutputName(node); } catch (_) { }
   try { ensureGetterLinkedToSetter(node); } catch (_) { }
+  try { _syncNodeTitleToVarName(node); } catch (_) { }
+  try { _colorizeSetterGetterNodes(node); } catch (_) { }
   app.canvas?.setDirty(true, true);
 }
 
@@ -210,6 +264,9 @@ function hookSetter(node) {
 
   w._akPrev = (typeof w.value === "string") ? w.value : "";
 
+  try { _syncNodeTitleToVarName(node); } catch (_) { }
+  try { _colorizeSetterGetterNodes(node); } catch (_) { }
+
   const prevCb = w.callback;
   w.callback = function (v) {
     const r = prevCb ? prevCb.call(this, v) : undefined;
@@ -220,6 +277,8 @@ function hookSetter(node) {
       w._akPrev = nv;
       const token = _setChangedName(ov, nv, node.id);
       try { updateCombos(app.graph, true); } catch (_) { }
+      try { _syncNodeTitleToVarName(node); } catch (_) { }
+      try { _colorizeSetterGetterNodes(node); } catch (_) { }
       _clearChangedNameLater(token);
     }
 
@@ -537,6 +596,8 @@ function hookGetter(node) {
     } catch (_) { }
     try { ensureGetterLinkedToSetter(node); } catch (_) { }
     try { _updateGetterOutputName(node); } catch (_) { }
+    try { _syncNodeTitleToVarName(node); } catch (_) { }
+    try { _colorizeSetterGetterNodes(node); } catch (_) { }
     return r;
   };
 }
@@ -550,6 +611,8 @@ app.registerExtension({
     if (node.type === "Setter") {
       _installHideSocketsPatch();
       hookSetter(node);
+      try { _syncNodeTitleToVarName(node); } catch (_) { }
+      try { _colorizeSetterGetterNodes(node); } catch (_) { }
       try { updateCombos(app.graph, true); } catch (_) { }
       return;
     }
@@ -559,6 +622,8 @@ app.registerExtension({
       if (node.type === "Getter") {
         hookGetter(node);
         try { ensureGetterLinkedToSetter(node); } catch (_) { }
+        try { _syncNodeTitleToVarName(node); } catch (_) { }
+        try { _colorizeSetterGetterNodes(node); } catch (_) { }
       }
       try { updateCombos(app.graph); } catch (_) { }
     }
@@ -581,17 +646,16 @@ app.registerExtension({
     if (node.type === "Setter") {
       _installHideSocketsPatch();
       hookSetter(node);
-      console.log("[AK] hookSetter installed", node.id, {
-        hasOnConnectInput: typeof node.onConnectInput,
-        hasOnConnectionsChange: typeof node.onConnectionsChange
-      });
-
+      try { _syncNodeTitleToVarName(node); } catch (_) { }
+      try { _colorizeSetterGetterNodes(node); } catch (_) { }
     }
     if (node.type === "Getter" || node.type === "Overrider") initGetterOverrider(node);
     if (node.type === "Getter") {
       hookGetter(node);
       try { ensureGetterLinkedToSetter(node); } catch (_) { }
       try { _updateGetterOutputName(node); } catch (_) { }
+      try { _syncNodeTitleToVarName(node); } catch (_) { }
+      try { _colorizeSetterGetterNodes(node); } catch (_) { } 
     }
   },
 
@@ -606,9 +670,9 @@ app.registerExtension({
       for (let i = 0; i < nodes.length; i++) {
         const n = nodes[i];
         if (!n) continue;
-        if (n.type === "Setter") hookSetter(n);
+        if (n.type === "Setter") { hookSetter(n); try { _syncNodeTitleToVarName(n); } catch (_) { }; try { _colorizeSetterGetterNodes(n); } catch (_) { } }
         if (n.type === "Getter" || n.type === "Overrider") initGetterOverrider(n);
-        if (n.type === "Getter") { hookGetter(n); try { _updateGetterOutputName(n); } catch (_) { } }
+        if (n.type === "Getter") { hookGetter(n); try { _updateGetterOutputName(n); } catch (_) { } try { _syncNodeTitleToVarName(n); } catch (_) { }; try { _colorizeSetterGetterNodes(n); } catch (_) { } }
       }
       updateCombos(g, true);
 
