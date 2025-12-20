@@ -228,28 +228,21 @@ function hookSetter(node) {
 }
 
 function _disableVarNameInputConnections(node) {
-  if (!node || node._akVarNoConnectVarName) return;
-  node._akVarNoConnectVarName = true;
-
-  const prev = node.onConnectInput;
-  node.onConnectInput = function (inputIndex, outputType, outputSlot, outputNode, outputIndex) {
-    try {
-      const inp = this.inputs && this.inputs[inputIndex];
-      if (inp && inp.name === "var_name") return false;
-    } catch (_) { }
-    return prev ? prev.call(this, inputIndex, outputType, outputSlot, outputNode, outputIndex) : true;
-  };
-
   try {
-    if (Array.isArray(node.inputs)) {
-      for (let i = 0; i < node.inputs.length; i++) {
-        const inp = node.inputs[i];
-        if (inp && inp.name === "var_name" && inp.link != null) {
-          node.disconnectInput(i);
-        }
-      }
-    }
-  } catch (_) { }
+    if (!node || node.type !== "Setter") return;
+    if (node._akVarVarNameTypePatched) return;
+    node._akVarVarNameTypePatched = true;
+
+    const inIdx = _findSlotIndexByName(node.inputs, "var_name");
+    if (inIdx < 0) return;
+
+    const inp = node.inputs[inIdx];
+    if (!inp) return;
+
+    inp.type = "__AK_VAR_NAME__";
+
+    if (inp.link != null) node.disconnectInput(inIdx);
+  } catch (_) {}
 }
 
 
@@ -290,7 +283,7 @@ function _updateGetterOutputName(getterNode) {
   }
 
   out0.name = newName;
-  out0.label = newName; // <-- ВАЖНО: чтобы точно поменялось визуально
+  out0.label = newName; 
 
   try {
     if (typeof getterNode.setSize === "function" && typeof getterNode.computeSize === "function") {
@@ -389,7 +382,6 @@ function _installHideLinksPatch() {
     const nodes = g._nodes || [];
     const saved = [];
 
-    // временно отцепляем inp у Getter'ов, если там hidden-link
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
       if (!n || n.type !== "Getter") continue;
@@ -409,7 +401,6 @@ function _installHideLinksPatch() {
 
     const r = fn();
 
-    // возвращаем обратно
     for (let k = 0; k < saved.length; k++) {
       const [node, slotIdx, linkId] = saved[k];
       try {
@@ -420,7 +411,6 @@ function _installHideLinksPatch() {
     return r;
   }
 
-  // Патчим самый верхний draw — это перекроет любой путь рисования линков
   if (!CanvasProto._akHideDrawPatched && typeof CanvasProto.draw === "function") {
     CanvasProto._akHideDrawPatched = true;
     const origDraw = CanvasProto.draw;
@@ -591,6 +581,10 @@ app.registerExtension({
     if (node.type === "Setter") {
       _installHideSocketsPatch();
       hookSetter(node);
+      console.log("[AK] hookSetter installed", node.id, {
+        hasOnConnectInput: typeof node.onConnectInput,
+        hasOnConnectionsChange: typeof node.onConnectionsChange
+      });
 
     }
     if (node.type === "Getter" || node.type === "Overrider") initGetterOverrider(node);
