@@ -1,5 +1,15 @@
 import { app } from "../../../scripts/app.js";
 
+const _akCallCount = Object.create(null);
+function _akCount(name, every = 50) {
+  const n = (_akCallCount[name] = (_akCallCount[name] || 0) + 1);
+  if (n === 1 || (every > 0 && (n % every) === 0)) {
+    console.warn(`[AK][Count] ${name} called ${n} times`);
+  }
+  return n;
+}
+
+
 function getWidget(node, name) {
   const ws = node?.widgets;
   if (!ws) return null;
@@ -76,7 +86,7 @@ function _syncNodeTitleToVarName(node) {
     // const newTitle = base ? (base + ": " + v) : v;
     let prefix = "";
     if (node.type === "Setter") prefix = "🔽 ";
-    else if (node.type === "Getter") prefix = "🔼 ";    
+    else if (node.type === "Getter") prefix = "🔼 ";
     const newTitle = prefix + v;
     if (node.title !== newTitle) {
       node.title = newTitle;
@@ -114,8 +124,8 @@ function _colorizeSetterGetterNodes() {
     try {
       if (g.setDirtyCanvas) g.setDirtyCanvas(true, true);
       if (globalThis.app?.canvas?.setDirty) globalThis.app.canvas.setDirty(true, true);
-    } catch (_) {}
-  } catch (_) {}
+    } catch (_) { }
+  } catch (_) { }
 }
 
 
@@ -142,96 +152,163 @@ function collectSetterNames(graph) {
 let _lastKey = "";
 let _lastNames = [];
 
+let _akUpdateCombosTimer = null;
+let _akUpdateCombosForce = false;
+
+function scheduleUpdateCombos(force = false) {
+  if (force) _akUpdateCombosForce = true;
+  if (_akUpdateCombosTimer) return;
+
+  _akUpdateCombosTimer = setTimeout(() => {
+    _akUpdateCombosTimer = null;
+    const f = _akUpdateCombosForce;
+    _akUpdateCombosForce = false;
+    try {
+      updateCombos(app.graph, f);
+    } catch (e) {
+      console.warn("[AK] scheduleUpdateCombos failed:", e);
+    }
+  }, 0);
+}
+
 function keyOf(names) {
   if (!names || !names.length) return "";
   return names.join("\u0001");
 }
 
 function applyNamesToNode(node, names) {
-  if (!node) return;
-  const vals = names || [];
+  _akCount("applyNamesToNode", 200);
+  if (node._akApplyNamesBusy) return;
+  node._akApplyNamesBusy = true;
+  try {
 
+    if (!node) return;
+    const vals = names || [];
 
-  // If dropdown is created before setters are hooked, values can be empty on first paint.
-  // Request a combo refresh once (async) without creating a sync recursion loop.
-  if ((!vals || !vals.length) && !globalThis._akVarNamesRefreshQueued) {
-    globalThis._akVarNamesRefreshQueued = true;
-    try { setTimeout(() => { try { updateCombos(app.graph, true); } catch (_) { } }, 0); } catch (_) { }
-    try { setTimeout(() => { try { updateCombos(app.graph, true); } catch (_) { } }, 200); } catch (_) { }
-  }
-  // We keep var_name as hidden STRING in Python, so we must render dropdown in JS.
-  let w = getWidget(node, "var_name");
+    const newKey = vals.length ? vals.join("\u0001") : "";
+    const prevKey = node._akVarValsKey || "";
+    const prevSel = node._akVarSel || "";
 
-  if (!w || w.type !== "combo") {
-    try {
-      if (node.widgets && node.widgets.length) {
-        node.widgets = node.widgets.filter(x => !(x && x.name === "var_name"));
-      }
+    // If dropdown values haven't changed and selection didn't change, do nothing.
+    // This avoids redraw/callback loops.
+    const w0 = getWidget(node, "var_name");
+    const curSel0 = (typeof w0?.value === "string") ? w0.value : "";
 
-      const curProp = (typeof node.properties?.var_name === "string") ? node.properties.var_name : "";
-      const initial = curProp || (vals.length ? vals[0] : "");
-
-      w = node.addWidget(
-        "combo",
-        "var_name",
-        initial,
-        function (v) {
-          try {
-            if (!node.properties) node.properties = {};
-            node.properties.var_name = v;
-          } catch (_) { }
-          try { ensureGetterLinkedToSetter(node); } catch (_) { }
-        },
-        { values: vals }
-      );
-
-      w._akVarInjected = true;
-
-      try {
-        if (!node.properties) node.properties = {};
-        node.properties.var_name = w.value;
-      } catch (_) { }
-    } catch (_) {
+    if (prevKey === newKey && prevSel === curSel0) {
       return;
     }
-  }
 
-  if (!w.options) w.options = {};
-  w.options.values = vals;
 
-  try { _applyChangedNameIfNeeded(node); } catch (_) { }
+    // If dropdown is created before setters are hooked, values can be empty on first paint.
+    // Request a combo refresh once (async) without creating a sync recursion loop.
+    if ((!vals || !vals.length) && !globalThis._akVarNamesRefreshQueued) {
+      console.warn("[AK] applyNamesToNode: empty values, scheduling updateCombos refresh");
+      globalThis._akVarNamesRefreshQueued = true;
+      // try { setTimeout(() => { try { updateCombos(app.graph, true); } catch (_) { } }, 0); } catch (_) { }
+      // try { setTimeout(() => { try { updateCombos(app.graph, true); } catch (_) { } }, 100); } catch (_) { }
+      try { setTimeout(() => { try { scheduleUpdateCombos(true); } catch (_) { }}, 100); } catch (_) { }
+    }
+    // We keep var_name as hidden STRING in Python, so we must render dropdown in JS.
+    let w = getWidget(node, "var_name");
 
-  const cur = (typeof w.value === "string") ? w.value : "";
+    if (!w || w.type !== "combo") {
+      try {
+        if (node.widgets && node.widgets.length) {
+          node.widgets = node.widgets.filter(x => !(x && x.name === "var_name"));
+        }
 
-  const saved = (() => {
+        const curProp = (typeof node.properties?.var_name === "string") ? node.properties.var_name : "";
+        const initial = curProp || (vals.length ? vals[0] : "");
+
+        w = node.addWidget(
+          "combo",
+          "var_name",
+          initial,
+          function (v) {
+            try {
+              if (!node.properties) node.properties = {};
+              node.properties.var_name = v;
+            } catch (_) { }
+            try { ensureGetterLinkedToSetter(node); } catch (_) { }
+          },
+          { values: vals }
+        );
+
+        w._akVarInjected = true;
+
+        try {
+          if (!node.properties) node.properties = {};
+          node.properties.var_name = w.value;
+        } catch (_) { }
+      } catch (_) {
+        return;
+      }
+    }
+
+    if (!w.options) w.options = {};
+    w.options.values = vals;
+
     try {
-      const p = (typeof node.properties?.var_name === "string") ? node.properties.var_name : "";
-      if (p && p.trim()) return p.trim();
+      const prevKey = node._akVarValsKey || "";
+      const newKey = vals.length ? vals.join("\u0001") : "";
+      const curSel = (typeof w.value === "string") ? w.value : "";
+      const prevSel = (typeof node._akVarSel === "string") ? node._akVarSel : "";
+
+      if (prevKey === newKey && prevSel === curSel) {
+        return;
+      }
+
+      node._akVarValsKey = newKey;
+      node._akVarSel = curSel;
     } catch (_) { }
-    return "";
-  })();
 
-  if (saved) {
-    if (cur !== saved) w.value = saved;
-  } else if (!cur) {
-    w.value = vals.length ? vals[0] : "";
-  } else {
-    // keep current
+    try { _applyChangedNameIfNeeded(node); } catch (_) { }
+
+    const cur = (typeof w.value === "string") ? w.value : "";
+
+    const saved = (() => {
+      try {
+        const p = (typeof node.properties?.var_name === "string") ? node.properties.var_name : "";
+        if (p && p.trim()) return p.trim();
+      } catch (_) { }
+      return "";
+    })();
+
+    if (saved) {
+      if (cur !== saved) {
+        w._akSilent = true;
+        w.value = saved;
+        w._akSilent = false;
+      }
+    } else if (!cur) {
+      if (vals.length) {
+        w._akSilent = true;
+        w.value = vals[0];
+        w._akSilent = false;
+      }
+    }
+
+    try {
+      if (!node.properties) node.properties = {};
+      node.properties.var_name = w.value;
+    } catch (_) { }
+
+    node._akVarValsKey = newKey;
+    node._akVarSel = (typeof w.value === "string") ? w.value : "";
+
+
+    try { _updateGetterOutputName(node); } catch (_) { }
+    try { ensureGetterLinkedToSetter(node); } catch (_) { }
+    try { _syncNodeTitleToVarName(node); } catch (_) { }
+    try { _colorizeSetterGetterNodes(node); } catch (_) { }
+    // app.canvas?.setDirty(true, true);
+  } finally {
+    node._akApplyNamesBusy = false;
   }
-
-  try {
-    if (!node.properties) node.properties = {};
-    node.properties.var_name = w.value;
-  } catch (_) { }
-
-  try { _updateGetterOutputName(node); } catch (_) { }
-  try { ensureGetterLinkedToSetter(node); } catch (_) { }
-  try { _syncNodeTitleToVarName(node); } catch (_) { }
-  try { _colorizeSetterGetterNodes(node); } catch (_) { }
-  app.canvas?.setDirty(true, true);
 }
 
 function updateCombos(graph, force = false) {
+  _akCount("updateCombos", 200);
   const names = collectSetterNames(graph);
   const k = keyOf(names);
   if (!force && k === _lastKey) return;
@@ -274,7 +351,8 @@ function hookSetter(node) {
       const ov = w._akPrev;
       w._akPrev = nv;
       const token = _setChangedName(ov, nv, node.id);
-      try { updateCombos(app.graph, true); } catch (_) { }
+      // try { updateCombos(app.graph, true); } catch (_) { }
+      try { scheduleUpdateCombos(true); } catch (_) { }
       try { _syncNodeTitleToVarName(node); } catch (_) { }
       try { _colorizeSetterGetterNodes(node); } catch (_) { }
       _clearChangedNameLater(token);
@@ -299,7 +377,7 @@ function _disableVarNameInputConnections(node) {
     inp.type = "__AK_VAR_NAME__";
 
     if (inp.link != null) node.disconnectInput(inIdx);
-  } catch (_) {}
+  } catch (_) { }
 }
 
 
@@ -340,7 +418,7 @@ function _updateGetterOutputName(getterNode) {
   }
 
   out0.name = newName;
-  out0.label = newName; 
+  out0.label = newName;
 
   try {
     if (typeof getterNode.setSize === "function" && typeof getterNode.computeSize === "function") {
@@ -479,15 +557,29 @@ function _installHideLinksPatch() {
 
 
 function _installHideSocketsPatch() {
+  _akCount("_installHideSocketsPatch", 2000);
   const CanvasProto =
     (globalThis.LGraphCanvas && globalThis.LGraphCanvas.prototype) ||
     (globalThis.LiteGraph && globalThis.LiteGraph.LGraphCanvas && globalThis.LiteGraph.LGraphCanvas.prototype);
 
   if (!CanvasProto) {
-    setTimeout(_installHideSocketsPatch, 0);
+    _akHideSocketsRetry++;
+    if (_akHideSocketsRetry === 1 || (_akHideSocketsRetry % 20) === 0) {
+      console.warn(`[AK] HideSockets: CanvasProto not ready (retry ${_akHideSocketsRetry})`);
+    }
+    if (_akHideSocketsRetry >= 200) {
+      console.error("[AK] HideSockets: giving up after 200 retries. drawNode patch NOT installed.");
+      return;
+    }
+    setTimeout(_installHideSocketsPatch, 50);
     return;
   }
 
+  /*   if (!CanvasProto) {
+      setTimeout(_installHideSocketsPatch, 0);
+      return;
+    }
+   */
   if (CanvasProto._akHideSocketsDrawNodePatched) return;
 
   const origDrawNode = CanvasProto.drawNode;
@@ -516,15 +608,15 @@ function _installHideSocketsPatch() {
       if (savedOutputs) node.outputs = savedOutputs;
     }
   };
-
+  try { _installHideLinksPatch(); } catch (_) { }
   console.log("[AK] HideSockets: drawNode patched");
 }
 
 
 function ensureGetterLinkedToSetter(node) {
   try {
-    _installHideLinksPatch();
-    _installHideSocketsPatch();
+    // _installHideLinksPatch();
+    // _installHideSocketsPatch();
 
     if (!node || node.type !== "Getter") return;
 
@@ -549,8 +641,8 @@ function ensureGetterLinkedToSetter(node) {
       const fromNode = g.getNodeById(l.origin_id);
       if (fromNode && fromNode.id === setter.id && l.origin_slot === outIdx) {
         _hideLinkInGraph(g, existingLinkId);
-        _installHideLinksPatch();
-        app.canvas?.setDirty(true, true);
+        // _installHideLinksPatch();
+        // app.canvas?.setDirty(true, true);
         return;
       }
     }
@@ -568,9 +660,9 @@ function ensureGetterLinkedToSetter(node) {
     const linkId = node.inputs[inIdx]?.link ?? null;
 
     _hideLinkInGraph(g, linkId);
-    _installHideLinksPatch();
+    //  _installHideLinksPatch();
 
-    app.canvas?.setDirty(true, true);
+    // app.canvas?.setDirty(true, true);
   } catch (_) { }
 }
 
@@ -611,30 +703,32 @@ app.registerExtension({
       hookSetter(node);
       try { _syncNodeTitleToVarName(node); } catch (_) { }
       try { _colorizeSetterGetterNodes(node); } catch (_) { }
-      try { updateCombos(app.graph, true); } catch (_) { }
+      // try { updateCombos(app.graph, false); } catch (_) { }
+      try { scheduleUpdateCombos(true); } catch (_) { }
       return;
     }
 
-    if (node.type === "Getter" || node.type === "Overrider") {
+    if (node.type === "Getter") {
       initGetterOverrider(node);
-      if (node.type === "Getter") {
-        hookGetter(node);
-        try { ensureGetterLinkedToSetter(node); } catch (_) { }
-        try { _syncNodeTitleToVarName(node); } catch (_) { }
-        try { _colorizeSetterGetterNodes(node); } catch (_) { }
-      }
-      try { updateCombos(app.graph); } catch (_) { }
+      hookGetter(node);
+      try { ensureGetterLinkedToSetter(node); } catch (_) { }
+      try { _syncNodeTitleToVarName(node); } catch (_) { }
+      try { _colorizeSetterGetterNodes(node); } catch (_) { }
+      // try { updateCombos(app.graph); } catch (_) { }
+      try { scheduleUpdateCombos(true); } catch (_) { }
     }
 
     // Ensure injected widgets appear immediately on add/recreate
     try {
       if (_isSetterNode(node)) {
-        setTimeout(() => { try { hookSetter(node); } catch (_) { } try { updateCombos(app.graph, true); } catch (_) { } }, 0);
-        setTimeout(() => { try { hookSetter(node); } catch (_) { } try { updateCombos(app.graph, true); } catch (_) { } }, 120);
+        // setTimeout(() => { try { hookSetter(node); } catch (_) { } try { updateCombos(app.graph, true); } catch (_) { } }, 0);
+        // setTimeout(() => { try { hookSetter(node); } catch (_) { } try { updateCombos(app.graph, true); } catch (_) { } }, 120);
+        setTimeout(() => { try { hookSetter(node); } catch (_) { } try { scheduleUpdateCombos(true); } catch (_) { } }, 120);
       }
       if (_isGetterNode(node)) {
-        setTimeout(() => { try { updateCombos(app.graph, true); } catch (_) { } try { initGetterOverrider(node); } catch (_) { } try { hookGetter(node); } catch (_) { } try { ensureGetterLinkedToSetter(node); } catch (_) { } }, 0);
-        setTimeout(() => { try { updateCombos(app.graph, true); } catch (_) { } try { initGetterOverrider(node); } catch (_) { } try { hookGetter(node); } catch (_) { } try { ensureGetterLinkedToSetter(node); } catch (_) { } }, 180);
+        // setTimeout(() => { try { updateCombos(app.graph, true); } catch (_) { } try { initGetterOverrider(node); } catch (_) { } try { hookGetter(node); } catch (_) { } try { ensureGetterLinkedToSetter(node); } catch (_) { } }, 0);
+        // setTimeout(() => { try { updateCombos(app.graph, true); } catch (_) { } try { initGetterOverrider(node); } catch (_) { } try { hookGetter(node); } catch (_) { } try { ensureGetterLinkedToSetter(node); } catch (_) { } }, 180);
+        setTimeout(() => { try { scheduleUpdateCombos(true); } catch (_) { } try { initGetterOverrider(node); } catch (_) { } try { hookGetter(node); } catch (_) { } try { ensureGetterLinkedToSetter(node); } catch (_) { } }, 180);
       }
     } catch (_) { }
   },
@@ -647,41 +741,17 @@ app.registerExtension({
       try { _syncNodeTitleToVarName(node); } catch (_) { }
       try { _colorizeSetterGetterNodes(node); } catch (_) { }
     }
-    if (node.type === "Getter" || node.type === "Overrider") initGetterOverrider(node);
+    if (node.type === "Getter") initGetterOverrider(node);
     if (node.type === "Getter") {
       hookGetter(node);
       try { ensureGetterLinkedToSetter(node); } catch (_) { }
       try { _updateGetterOutputName(node); } catch (_) { }
       try { _syncNodeTitleToVarName(node); } catch (_) { }
-      try { _colorizeSetterGetterNodes(node); } catch (_) { } 
+      try { _colorizeSetterGetterNodes(node); } catch (_) { }
     }
   },
 
-  async graphLoaded() {
-    console.log("graphLoaded")
-    try {
-      try { setTimeout(() => { try { updateCombos(app.graph, true); } catch (_) { } }, 0); } catch (_) { }
-      _installHideLinksPatch();
-      _installHideSocketsPatch();
-      const g = app.graph;
-      const nodes = g?._nodes || [];
-      for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        if (!n) continue;
-        if (n.type === "Setter") { hookSetter(n); try { _syncNodeTitleToVarName(n); } catch (_) { }; try { _colorizeSetterGetterNodes(n); } catch (_) { } }
-        if (n.type === "Getter" || n.type === "Overrider") initGetterOverrider(n);
-        if (n.type === "Getter") { hookGetter(n); try { _updateGetterOutputName(n); } catch (_) { } try { _syncNodeTitleToVarName(n); } catch (_) { }; try { _colorizeSetterGetterNodes(n); } catch (_) { } }
-      }
-      updateCombos(g, true);
 
-      for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        if (n && n.type === "Getter") {
-          try { ensureGetterLinkedToSetter(n); } catch (_) { }
-        }
-      }
-    } catch (_) {
-      console.log("ERROR")
-    }
-  }
+
+
 });
