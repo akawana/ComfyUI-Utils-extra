@@ -288,5 +288,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "AKResizeOnBoolean": "AKResizeOnBoolean"
+    "AKResizeOnBoolean": "AK Resize On Boolean"
 }
