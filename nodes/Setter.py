@@ -114,10 +114,6 @@ class Setter:
         if not isinstance(var_name, str):
             var_name = str(var_name)
         name = var_name.strip()
-        try:
-            print(f"[AKVar Setter {unique_id}] var_name={name!r} obj_type={type(obj).__name__}")
-        except Exception:
-            pass
         if not name:
             raise Exception(f"[Setter {unique_id}] var_name is empty")
 
@@ -127,15 +123,7 @@ class Setter:
             bisect.insort(st.names_sorted, name)
 
         value = obj[0] if isinstance(obj, (list, tuple)) else obj
-        try:
-            print(f"[AKVar Setter {unique_id}] OUT value_type={type(value).__name__} value_repr={repr(value)[:500]}")
-        except Exception:
-            pass
         st.values_by_name[name] = value
-        try:
-            print(f"[AKVar Setter {unique_id}] returning OUT")
-        except Exception:
-            pass
         return (value,)
 
 NODE_CLASS_MAPPINGS = {
