@@ -81,7 +81,8 @@ export function installInputHandlers(node) {
 
       const fn = `ak_base_settings_${nid}.json`;
       console.log("[AKBase] loading settings json:", fn);
-      try {const cfg = await fetchTempJson(fn);} catch (e) {
+      let cfg = null;
+      try {cfg = await fetchTempJson(fn);} catch (e) {
         console.log("[AKBase] settings json not found (skip):", fn);
         return;
       }
