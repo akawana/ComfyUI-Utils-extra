@@ -1,10 +1,72 @@
 import { app } from "/scripts/app.js";
-import { previewRect, backButtonRect } from "./AKBase_ui.js";
+import { previewRect, backButtonRect, copyButtonRect } from "./AKBase_ui.js";
 import { fetchTempJson, buildTempViewUrl, loadImageFromUrl, readPngTextChunks } from "./AKBase_io.js";
 
 export function installInputHandlers(node) {
   const state = node._akBase;
   if (!state) return;
+
+
+  async function copyTopLayerImageToClipboard() {
+    try {
+      const enabled = (state.mode === "compare");
+      console.log("[AKBase] copyTopLayerImageToClipboard", { enabled, mode: state.mode });
+      if (!enabled) return false;
+
+      const img = state?.b?.img || null;
+      const url = state?.b?.url || (img?.src || null);
+      console.log("[AKBase] copy source", { hasImg: !!img, url });
+
+      if (!navigator?.clipboard?.write || typeof window.ClipboardItem !== "function") {
+        console.log("[AKBase] copy failed: ClipboardItem API not available");
+        return false;
+      }
+
+      let blob = null;
+
+      if (url) {
+        try {
+          const res = await fetch(url, { cache: "no-store" });
+          console.log("[AKBase] copy fetch", { ok: res.ok, status: res.status, url });
+          if (res.ok) blob = await res.blob();
+        } catch (e) {
+          console.log("[AKBase] copy fetch error", e);
+        }
+      }
+
+      if (!blob && img) {
+        const w = Math.max(1, Number(img.naturalWidth || img.width || 0) || 1);
+        const h = Math.max(1, Number(img.naturalHeight || img.height || 0) || 1);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          console.log("[AKBase] copy failed: no canvas context");
+          return false;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        blob = await new Promise((resolve) => {
+          try { canvas.toBlob(resolve, "image/png"); } catch (_) { resolve(null); }
+        });
+      }
+
+      if (!blob) {
+        console.log("[AKBase] copy failed: no blob");
+        return false;
+      }
+
+      console.log("[AKBase] copy blob", { type: blob.type, size: blob.size });
+
+      const mime = (blob.type && String(blob.type).startsWith("image/")) ? blob.type : "image/png";
+      await navigator.clipboard.write([new ClipboardItem({ [mime]: blob })]);
+      console.log("[AKBase] copy success");
+      return true;
+    } catch (e) {
+      console.log("[AKBase] copy exception", e);
+      return false;
+    }
+  }
 
   async function setConnectedNodeValue(seedIn) {
     try {
@@ -19,7 +81,10 @@ export function installInputHandlers(node) {
 
       const fn = `ak_base_settings_${nid}.json`;
       console.log("[AKBase] loading settings json:", fn);
-      const cfg = await fetchTempJson(fn);
+      try {const cfg = await fetchTempJson(fn);} catch (e) {
+        console.log("[AKBase] settings json not found (skip):", fn);
+        return;
+      }
       console.log("[AKBase] loaded settings json:", cfg);
 
       const fromId = cfg?.from_id;
@@ -198,6 +263,47 @@ export function installInputHandlers(node) {
     app.graph.setDirtyCanvas(true, true);
   }
 
+  async function copyCompareImageToClipboard() {
+    try {
+      const enabled = (state.mode === "compare");
+      if (!enabled) return false;
+
+      const hasReady = !!state?.a?.loaded || !!state?.b?.loaded;
+      if (!hasReady) return false;
+
+      const url =
+        state?.b?.url || state?.b?.img?.src ||
+        state?.a?.url || state?.a?.img?.src ||
+        null;
+
+      if (!url) return false;
+
+      if (!navigator?.clipboard || typeof navigator.clipboard.write !== "function" || typeof window.ClipboardItem !== "function") {
+        console.log("[AKBase] clipboard image write is not supported");
+        return false;
+      }
+
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) {
+        console.log("[AKBase] copy fetch failed", res.status);
+        return false;
+      }
+
+      const blob = await res.blob();
+      const mime = blob?.type || "image/png";
+
+      await navigator.clipboard.write([
+        new ClipboardItem({ [mime]: blob })
+      ]);
+
+      console.log("[AKBase] image copied to clipboard");
+      return true;
+    } catch (e) {
+      console.log("[AKBase] copyCompareImageToClipboard exception:", e);
+      return false;
+    }
+  }
+
   node.onMouseMove = function (e, pos) {
     let localX = pos[0];
     let localY = pos[1];
@@ -259,6 +365,17 @@ export function installInputHandlers(node) {
       console.log("[AKBase] back button click", { enabled });
       if (enabled) {
         (async () => { await state.backToGallery?.(); })();
+      }
+      return true;
+    }
+
+    const copyBtn = copyButtonRect(this);
+    const insideCopyBtn = localX >= copyBtn.x && localX <= copyBtn.x + copyBtn.w && localY >= copyBtn.y && localY <= copyBtn.y + copyBtn.h;
+    if (insideCopyBtn) {
+      const enabled = (state.mode === "compare");
+      console.log("[AKBase] copy button click", { enabled });
+      if (enabled) {
+        (async () => { await copyTopLayerImageToClipboard(); })();
       }
       return true;
     }

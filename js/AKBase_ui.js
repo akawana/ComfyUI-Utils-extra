@@ -56,6 +56,13 @@ export function backButtonRect(node) {
   return { x, y, w, h };
 }
 
+export function copyButtonRect(node) {
+  const b = backButtonRect(node);
+  const gap = 6;
+  return { x: b.x, y: b.y + b.h + gap, w: b.w, h: b.h };
+}
+
+
 function fitRect(srcW, srcH, dstW, dstH, mode) {
   if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) return { x: 0, y: 0, w: 0, h: 0 };
   const s = (mode === "cover") ? Math.max(dstW / srcW, dstH / srcH) : Math.min(dstW / srcW, dstH / srcH);
@@ -134,10 +141,43 @@ export function installDraw(node, dbg) {
     ctx.fillText("Back to gallery", btn.x + btn.w / 2, btn.y + btn.h / 2);
     ctx.restore();
 
-    if (!state._drawLogged) {
-      state._drawLogged = true;
-      dbg("first draw", this.id, { mode: state.mode });
-    }
+    const copyBtn = copyButtonRect(this);
+    const copyBtnEnabled = (state.mode === "compare") && (state.a.loaded || state.b.loaded);
+    // const copyBtnEnabled = (state.mode === "compare") && !!state.hasGallery;
+
+    ctx.save();
+    ctx.globalAlpha = copyBtnEnabled ? 1.0 : 0.45;
+    ctx.fillStyle = "#2a2a2a";
+    ctx.strokeStyle = "#555";
+    ctx.lineWidth = 1;
+
+    ctx.beginPath();
+    const rr2 = 6;
+    const cx0 = copyBtn.x, cy0 = copyBtn.y, cx1 = copyBtn.x + copyBtn.w, cy1 = copyBtn.y + copyBtn.h;
+    ctx.moveTo(cx0 + rr2, cy0);
+    ctx.lineTo(cx1 - rr2, cy0);
+    ctx.quadraticCurveTo(cx1, cy0, cx1, cy0 + rr2);
+    ctx.lineTo(cx1, cy1 - rr2);
+    ctx.quadraticCurveTo(cx1, cy1, cx1 - rr2, cy1);
+    ctx.lineTo(cx0 + rr2, cy1);
+    ctx.quadraticCurveTo(cx0, cy1, cx0, cy1 - rr2);
+    ctx.lineTo(cx0, cy0 + rr2);
+    ctx.quadraticCurveTo(cx0, cy0, cx0 + rr2, cy0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#e8e8e8";
+    ctx.font = "14px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Copy image", copyBtn.x + copyBtn.w / 2, copyBtn.y + copyBtn.h / 2);
+    ctx.restore();
+
+    // if (!state._drawLogged) {
+    //   state._drawLogged = true;
+    //   dbg("first draw", this.id, { mode: state.mode });
+    // }
 
     ctx.save();
     ctx.beginPath();
