@@ -5,6 +5,9 @@ import { buildTempViewUrl, loadImageFromUrl, loadGalleryByCount, fetchTempJson, 
 import { installInputHandlers } from "./AKBase_input.js";
 import { applyNodeLayout, installDraw } from "./AKBase_ui.js";
 
+import "./AKBase_pip.js";
+
+
 const AKBASE_VERSION = "v11-statefile";
 
 window.AKBASE_DEBUG ??= true;

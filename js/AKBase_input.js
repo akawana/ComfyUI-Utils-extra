@@ -1,5 +1,5 @@
 import { app } from "/scripts/app.js";
-import { previewRect, backButtonRect, copyButtonRect } from "./AKBase_ui.js";
+import { previewRect, backButtonRect, copyButtonRect, pipButtonRect } from "./AKBase_ui.js";
 import { fetchTempJson, buildTempViewUrl, loadImageFromUrl, readPngTextChunks } from "./AKBase_io.js";
 
 export function installInputHandlers(node) {
@@ -376,6 +376,21 @@ export function installInputHandlers(node) {
       console.log("[AKBase] copy button click", { enabled });
       if (enabled) {
         (async () => { await copyTopLayerImageToClipboard(); })();
+      }
+      return true;
+    }
+
+    const pipBtn = pipButtonRect(this);
+    const insidePipBtn = localX >= pipBtn.x && localX <= pipBtn.x + pipBtn.w && localY >= pipBtn.y && localY <= pipBtn.y + pipBtn.h;
+    if (insidePipBtn) {
+      console.log("[AKBase] Open PIP button click");
+      try {
+        const nid = node?.id;
+        if (window.AKBasePip && typeof window.AKBasePip.openForNode === "function") {
+          window.AKBasePip.openForNode(nid);
+        }
+      } catch (e) {
+        console.log("[AKBase] Open PIP error", e);
       }
       return true;
     }

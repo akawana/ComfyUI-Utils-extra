@@ -62,6 +62,13 @@ export function copyButtonRect(node) {
   return { x: b.x, y: b.y + b.h + gap, w: b.w, h: b.h };
 }
 
+export function pipButtonRect(node) {
+  const c = copyButtonRect(node);
+  const gap = 6;
+  return { x: c.x, y: c.y + c.h + gap, w: c.w, h: c.h };
+}
+
+
 
 function fitRect(srcW, srcH, dstW, dstH, mode) {
   if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) return { x: 0, y: 0, w: 0, h: 0 };
@@ -100,6 +107,85 @@ function computeBestGrid(W, H, iw, ih, N, gap) {
     }
   }
   return best;
+}
+
+
+
+export function renderCompare(ctx, r, state, view) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(r.x, r.y, r.w, r.h);
+  ctx.clip();
+
+  ctx.fillStyle = `rgba(0,0,0,${UI_SETTINGS.previewBgAlpha})`;
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+
+  const zoom = view && typeof view.zoom === "number" ? view.zoom : 1;
+  const offsetX = view && typeof view.offsetX === "number" ? view.offsetX : 0;
+  const offsetY = view && typeof view.offsetY === "number" ? view.offsetY : 0;
+  const hasViewTransform = zoom !== 1 || offsetX !== 0 || offsetY !== 0;
+
+  const drawImg = (img, alpha) => {
+    if (!img) return;
+    const fit = fitRect(img.naturalWidth, img.naturalHeight, r.w, r.h, UI_SETTINGS.imageFitMode);
+    let dx = r.x + fit.x;
+    let dy = r.y + fit.y;
+    let dw = fit.w;
+    let dh = fit.h;
+
+    if (hasViewTransform) {
+      dx = dx * zoom + offsetX;
+      dy = dy * zoom + offsetY;
+      dw = dw * zoom;
+      dh = dh * zoom;
+    }
+
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(img, dx, dy, dw, dh);
+  };
+
+
+  const aReady = !!state?.a?.loaded;
+  const bReady = !!state?.b?.loaded;
+
+  if (!aReady && !bReady) {
+    ctx.globalAlpha = 1.0;
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.font = "12px sans-serif";
+    ctx.fillText("No preview images loaded", r.x + 10, r.y + 24);
+    if (state?.a?.url) ctx.fillText("A: " + state.a.url, r.x + 10, r.y + 44);
+    if (state?.b?.url) ctx.fillText("B: " + state.b.url, r.x + 10, r.y + 62);
+  } else if (UI_SETTINGS.wipeMode && state?.inPreview && aReady && bReady) {
+    drawImg(state.a.img, 1.0);
+
+    const cx = r.x + r.w * (state.cursorX ?? 0.5);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cx, r.y, r.x + r.w - cx, r.h);
+    ctx.clip();
+    drawImg(state.b.img, 1.0);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = UI_SETTINGS.lineAlpha;
+    ctx.strokeStyle = "rgba(255,255,255,1)";
+    ctx.lineWidth = UI_SETTINGS.lineWidth;
+    ctx.beginPath();
+    ctx.moveTo(cx + 0.5, r.y);
+    ctx.lineTo(cx + 0.5, r.y + r.h);
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    if (aReady) drawImg(state.a.img, 1.0);
+    if (bReady) drawImg(state.b.img, 1.0);
+  }
+
+  ctx.restore();
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+  ctx.restore();
 }
 
 export function installDraw(node, dbg) {
@@ -172,6 +258,38 @@ export function installDraw(node, dbg) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("Copy image", copyBtn.x + copyBtn.w / 2, copyBtn.y + copyBtn.h / 2);
+    ctx.restore();
+
+    const pipBtn = pipButtonRect(this);
+    const pipBtnEnabled = true;
+
+    ctx.save();
+    ctx.globalAlpha = pipBtnEnabled ? 1.0 : 0.45;
+    ctx.fillStyle = "#2a2a2a";
+    ctx.strokeStyle = "#555";
+    ctx.lineWidth = 1;
+
+    ctx.beginPath();
+    const rr3 = 6;
+    const px0 = pipBtn.x, py0 = pipBtn.y, px1 = pipBtn.x + pipBtn.w, py1 = pipBtn.y + pipBtn.h;
+    ctx.moveTo(px0 + rr3, py0);
+    ctx.lineTo(px1 - rr3, py0);
+    ctx.quadraticCurveTo(px1, py0, px1, py0 + rr3);
+    ctx.lineTo(px1, py1 - rr3);
+    ctx.quadraticCurveTo(px1, py1, px1 - rr3, py1);
+    ctx.lineTo(px0 + rr3, py1);
+    ctx.quadraticCurveTo(px0, py1, px0, py1 - rr3);
+    ctx.lineTo(px0, py0 + rr3);
+    ctx.quadraticCurveTo(px0, py0, px0 + rr3, py0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#e8e8e8";
+    ctx.font = "14px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Open PIP", pipBtn.x + pipBtn.w / 2, pipBtn.y + pipBtn.h / 2);
     ctx.restore();
 
     // if (!state._drawLogged) {
