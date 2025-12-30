@@ -74,8 +74,10 @@ function cleanupPipWindow(container) {
   } catch (_) {}
 }
 
-function destroyPipWindow() {
-  const container = document.getElementById(PIP_ID);
+function destroyPipWindow(container) {
+  if (!container) {
+    container = document.getElementById(PIP_ID);
+  }
   if (!container) return;
   cleanupPipWindow(container);
   if (container.parentNode) {
@@ -84,7 +86,8 @@ function destroyPipWindow() {
 }
 
 function createPipWindow(nodeId) {
-  if (document.getElementById(PIP_ID)) return;
+  const pipId = `${PIP_ID}-${nodeId}`;
+  if (document.getElementById(pipId)) return;
 
   const dpr = window.devicePixelRatio || 1;
   const viewportWidth = window.innerWidth || 800;
@@ -115,10 +118,10 @@ function createPipWindow(nodeId) {
   const windowHeight = canvasHeight + TITLE_HEIGHT;
 
   const container = document.createElement("div");
-  container.id = PIP_ID;
+  container.id = pipId;
   container.style.position = "fixed";
   container.style.boxSizing = "border-box";
-  container.style.left = `${Math.max(10, viewportWidth - windowWidth - 20)}px`;
+  container.style.left = `${Math.max(10, (viewportWidth - windowWidth) / 2)}px`;
   container.style.top = "20px";
   container.style.width = `${windowWidth}px`;
   container.style.height = `${windowHeight}px`;
@@ -148,6 +151,8 @@ function createPipWindow(nodeId) {
   titleBar.style.fontFamily =
     "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   titleBar.style.display = "flex";
+  titleBar.style.position = "relative";
+  titleBar.style.zIndex = "2";
   titleBar.style.alignItems = "center";
   titleBar.style.justifyContent = "space-between";
   titleBar.style.boxSizing = "border-box";
@@ -177,12 +182,10 @@ function createPipWindow(nodeId) {
 
   // Canvas area, no padding around
   const canvas = document.createElement("canvas");
-  canvas.style.flex = "1 1 auto";
+  canvas.style.flex = "0 0 auto";
   canvas.style.display = "block";
-  canvas.style.width = "100%";
-  canvas.style.height = `calc(100% - ${TITLE_HEIGHT}px)`;
-  canvas.style.background = "#000";
-  canvas.style.margin = "0";
+  canvas.style.background = "red";
+  canvas.style.margin = "0 auto";
   canvas.style.padding = "0";
 
   canvas.width = Math.floor(canvasWidth * dpr);
@@ -214,26 +217,85 @@ function createPipWindow(nodeId) {
 
   function onCanvasWheel(e) {
     e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
 
-    const logicalX = x;
-    const logicalY = y;
+    const canvasRect = canvas.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
 
     const oldZoom = pipState.zoom || 1;
     const zoomFactor = e.deltaY < 0 ? 1.1 : 1.0 / 1.1;
     const newZoom = Math.min(5, Math.max(0.2, oldZoom * zoomFactor));
 
-    const ox = pipState.offsetX || 0;
-    const oy = pipState.offsetY || 0;
+    // Determine if pointer is currently over the canvas
+    const overCanvas =
+      e.clientX >= canvasRect.left &&
+      e.clientX <= canvasRect.right &&
+      e.clientY >= canvasRect.top &&
+      e.clientY <= canvasRect.bottom;
 
-    const worldX = (logicalX - ox) / oldZoom;
-    const worldY = (logicalY - oy) / oldZoom;
+    // If this is a zoom IN and the mouse is NOT over the canvas — ignore
+    if (newZoom > oldZoom && !overCanvas) {
+      return;
+    }
+
+    // Compute mouse positions (container-local)
+    const mouseX = e.clientX - containerRect.left;
+    const mouseY = e.clientY - containerRect.top;
+
+    const oldWidth = canvasRect.width || 1;
+    const oldHeight = canvasRect.height || 1;
+
+    const relX = (e.clientX - canvasRect.left) / oldWidth;
+    const relY = (e.clientY - canvasRect.top) / oldHeight;
+
+    // If we are zooming IN — update the anchor
+    if (newZoom > oldZoom) {
+      pipState.lastZoomAnchor = {
+        mouseX,
+        mouseY,
+        relX,
+        relY
+      };
+    }
+
+    // If zooming OUT — reuse anchor if available
+    let useMouseX = mouseX;
+    let useMouseY = mouseY;
+    let useRelX = relX;
+    let useRelY = relY;
+
+    if (newZoom < oldZoom && pipState.lastZoomAnchor) {
+      useMouseX = pipState.lastZoomAnchor.mouseX;
+      useMouseY = pipState.lastZoomAnchor.mouseY;
+      useRelX = pipState.lastZoomAnchor.relX;
+      useRelY = pipState.lastZoomAnchor.relY;
+    }
 
     pipState.zoom = newZoom;
-    pipState.offsetX = logicalX - worldX * newZoom;
-    pipState.offsetY = logicalY - worldY * newZoom;
+
+    if (typeof resizeCanvasToWindow === "function") {
+      resizeCanvasToWindow(container, canvas, true);
+    }
+
+    // Reset transform to measure freshly sized canvas
+    canvas.style.transform = "translate(0px, 0px)";
+
+    const baseRect = canvas.getBoundingClientRect();
+    const baseLeft = baseRect.left - containerRect.left;
+    const baseTop = baseRect.top - containerRect.top;
+
+    const newWidth = baseRect.width || 1;
+    const newHeight = baseRect.height || 1;
+
+    const desiredLeft = useMouseX - useRelX * newWidth;
+    const desiredTop = useMouseY - useRelY * newHeight;
+
+    const offsetX = desiredLeft - baseLeft;
+    const offsetY = desiredTop - baseTop;
+
+    pipState.offsetX = offsetX;
+    pipState.offsetY = offsetY;
+
+    canvas.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
   }
 
 
@@ -272,7 +334,7 @@ function createPipWindow(nodeId) {
   }
   canvas.addEventListener("mousemove", onCanvasMove);
   canvas.addEventListener("mouseleave", onCanvasLeave);
-  canvas.addEventListener("wheel", onCanvasWheel, { passive: false });
+  container.addEventListener("wheel", onCanvasWheel, { passive: false });
   canvas.addEventListener("mousedown", onCanvasPanMouseDown);
 
   container._akPipCanvasCleanup = function () {
@@ -347,14 +409,27 @@ function createPipWindow(nodeId) {
     }
   });
 
+  const resetZoomButton = createTitleIconButton("img/i_reset_off.png", "Reset zoom", () => {
+    pipState.zoom = 1;
+    pipState.offsetX = 0;
+    pipState.offsetY = 0;
+    resizeCanvasToWindow(container, canvas);
+  });
+
+  const resetZoomImg = resetZoomButton.querySelector("img");
+  if (resetZoomImg) {
+    container._akPipResetImg = resetZoomImg;
+  }
+
   if (typeof leftButtons !== "undefined") {
     leftButtons.appendChild(maximizeButton);
+    leftButtons.appendChild(resetZoomButton);
     leftButtons.style.gap = "6px";
-    leftButtons.style.minWidth = AKBASE_PIP_BUTTON_SIZE + "px";
+    leftButtons.style.minWidth = AKBASE_PIP_BUTTON_SIZE * 2 + "px";
   }
 
   const closeButton = createTitleIconButton("img/i_close.png", "Close", () => {
-    destroyPipWindow();
+    destroyPipWindow(container);
   });
 
   if (typeof rightButtons !== "undefined") {
@@ -659,6 +734,35 @@ function startPipRenderLoop(container, canvas) {
 
     const state = getNodeStateForPip();
 
+    // Track source image dimensions for canvas sizing.
+    if (state) {
+      let img = null;
+      if (state.a && state.a.img) {
+        img = state.a.img;
+      } else if (state.b && state.b.img) {
+        img = state.b.img;
+      }
+      if (img && typeof img.naturalWidth === "number" && img.naturalWidth > 0 && typeof img.naturalHeight === "number" && img.naturalHeight > 0) {
+        const prevW = container._akPipImgWidth || 0;
+        const prevH = container._akPipImgHeight || 0;
+
+        container._akPipImgWidth = img.naturalWidth;
+        container._akPipImgHeight = img.naturalHeight;
+
+        // When image dimensions appear for the first time (or change) in normal mode,
+        // recalculate canvas size so it fits/centers correctly without requiring a manual resize.
+        const pip = container._akPipState;
+        const zoomNow = pip && typeof pip.zoom === "number" ? pip.zoom : 1;
+        const isZoom = zoomNow !== 1;
+
+        if (!isZoom && typeof resizeCanvasToWindow === "function") {
+          if (prevW !== container._akPipImgWidth || prevH !== container._akPipImgHeight) {
+            resizeCanvasToWindow(container, canvas, false);
+          }
+        }
+      }
+    }
+
     ctx.save();
     ctx.scale(dpr, dpr);
 
@@ -666,11 +770,27 @@ function startPipRenderLoop(container, canvas) {
     const offsetX = pipState.offsetX || 0;
     const offsetY = pipState.offsetY || 0;
 
+    // Move the whole canvas inside the dialog using CSS transform.
+    canvas.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+
+    const isZoomMode =
+      zoom !== 1 ||
+      (offsetX || 0) !== 0 ||
+      (offsetY || 0) !== 0;
+
+    const resetImg = container._akPipResetImg || null;
+    if (resetImg) {
+      const expectedSrc = extensionBaseUrl + (isZoomMode ? "img/i_reset.png" : "img/i_reset_off.png");
+      if (resetImg.src !== expectedSrc) {
+        resetImg.src = expectedSrc;
+      }
+    }
+
         if (state && state.mode === "compare" && typeof renderCompare === "function") {
       const view = {
-        zoom: pipState.zoom || 1,
-        offsetX: pipState.offsetX || 0,
-        offsetY: pipState.offsetY || 0,
+        zoom: 1,
+        offsetX: 0,
+        offsetY: 0,
       };
       const r = { x: 0, y: 0, w: logicalWidth, h: logicalHeight };
       try {
@@ -704,43 +824,61 @@ function startPipRenderLoop(container, canvas) {
   window.requestAnimationFrame(frame);
 }
 
-function resizeCanvasToWindow(container, canvas) {
+function resizeCanvasToWindow(container, canvas, allowZoomResize = false) {
   const dpr = window.devicePixelRatio || 1;
   const rect = container.getBoundingClientRect();
-  const width = rect.width;
-  const height = rect.height;
+  const containerWidth = rect.width;
+  const containerHeight = rect.height;
 
-  const canvasWidth = Math.max(0, Math.floor(width));
-  const canvasHeight = Math.max(0, Math.floor(height - TITLE_HEIGHT));
+  const pipState = container._akPipState || {};
+  const zoom = pipState.zoom || 1;
+  const isZoomMode = zoom !== 1;
 
-  const pipState = container._akPipState;
-  const prevW = typeof container._akPipLastWidth === "number" ? container._akPipLastWidth : canvasWidth;
-  const prevH = typeof container._akPipLastHeight === "number" ? container._akPipLastHeight : canvasHeight;
+  // In zoom mode, ignore window size changes triggered by container resize.
+  if (isZoomMode && !allowZoomResize) {
+    const currentRect = canvas.getBoundingClientRect();
+    const currentW = currentRect.width || (canvas.width / dpr);
+    const currentH = currentRect.height || (canvas.height / dpr);
 
-  if (pipState && (pipState.zoom !== 1 || (pipState.offsetX || 0) !== 0 || (pipState.offsetY || 0) !== 0)) {
-    const centerOldX = prevW * 0.5;
-    const centerOldY = prevH * 0.5;
+    container._akPipLastWidth = currentW;
+    container._akPipLastHeight = currentH;
 
-    const oldZoom = pipState.zoom || 1;
-    const offsetX = pipState.offsetX || 0;
-    const offsetY = pipState.offsetY || 0;
+    canvas.style.width = `${currentW}px`;
+    canvas.style.height = `${currentH}px`;
 
-    const worldCenterX = (centerOldX - offsetX) / oldZoom;
-    const worldCenterY = (centerOldY - offsetY) / oldZoom;
-
-    const prevMin = Math.max(1, Math.min(prevW, prevH));
-    const newMin = Math.max(1, Math.min(canvasWidth, canvasHeight));
-    const scaleFactor = prevMin / newMin;
-    const newZoom = oldZoom * scaleFactor;
-
-    pipState.zoom = newZoom;
-
-    const centerNewX = canvasWidth * 0.5;
-    const centerNewY = canvasHeight * 0.5;
-
-    pipState.offsetX = centerNewX - worldCenterX * newZoom;
-    pipState.offsetY = centerNewY - worldCenterY * newZoom;
+    canvas.width = Math.max(1, Math.floor(currentW * dpr));
+    canvas.height = Math.max(1, Math.floor(currentH * dpr));
+    return;
   }
+
+  // Base image size (fallback to container size if unknown).
+  const imgW =
+    container._akPipImgWidth && container._akPipImgWidth > 0
+      ? container._akPipImgWidth
+      : containerWidth;
+  const imgH =
+    container._akPipImgHeight && container._akPipImgHeight > 0
+      ? container._akPipImgHeight
+      : (containerHeight - TITLE_HEIGHT);
+
+  const availW = Math.max(1, Math.floor(containerWidth));
+  const availH = Math.max(1, Math.floor(containerHeight - TITLE_HEIGHT));
+
+  // Base scale: how the image fits into the window at zoom = 1.
+  let baseScale =
+    typeof container._akPipBaseScale === "number" && container._akPipBaseScale > 0
+      ? container._akPipBaseScale
+      : null;
+
+  // Recalculate base scale when not in zoom mode or if it was never set.
+  if (!isZoomMode || baseScale === null) {
+    baseScale = Math.min(availW / imgW, availH / imgH);
+    container._akPipBaseScale = baseScale;
+  }
+
+  // Apply zoom by resizing the canvas itself relative to the base scale.
+  const canvasWidth = Math.max(1, Math.floor(imgW * baseScale * zoom));
+  const canvasHeight = Math.max(1, Math.floor(imgH * baseScale * zoom));
 
   container._akPipLastWidth = canvasWidth;
   container._akPipLastHeight = canvasHeight;
@@ -751,6 +889,7 @@ function resizeCanvasToWindow(container, canvas) {
   canvas.width = Math.max(1, Math.floor(canvasWidth * dpr));
   canvas.height = Math.max(1, Math.floor(canvasHeight * dpr));
 }
+
 
 app.registerExtension({
   name: "AKBasePiP",

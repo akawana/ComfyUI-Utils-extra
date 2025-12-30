@@ -1,6 +1,6 @@
 export const UI_SETTINGS = {
   backButtonYShift: 0,
-  backButtonWidthPercent: 50,
+  buttonToolbarWidthPercent: 50,
   previewPadding: 10,
   previewYShift: 80,
   previewMinWidth: 240,
@@ -20,6 +20,59 @@ export const UI_SETTINGS = {
 
   galleryGap: 4,
 };
+
+const EXT_BASE_URL = "/extensions/ComfyUI-AK-Pack/";
+
+const BUTTON_ROW_HEIGHT = 28;
+const BUTTON_ROW_GAP = 4;
+const BUTTON_ICON_SIZE = 20;
+
+function createIcon(src) {
+  const img = new Image();
+  img.src = EXT_BASE_URL + src;
+  return img;
+}
+
+const AKBASE_ICONS = {
+  back: createIcon("img/i_gallery.png"),
+  copy: createIcon("img/i_copy.png"),
+  pip: createIcon("img/i_pip_in.png"),
+};
+
+function drawIconButton(ctx, rect, img, enabled) {
+  const alpha = enabled ? 1.0 : 0.45;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "#2a2a2a";
+  ctx.strokeStyle = "#555";
+  ctx.lineWidth = 1;
+
+  const rr = 6;
+  const x0 = rect.x, y0 = rect.y, x1 = rect.x + rect.w, y1 = rect.y + rect.h;
+  ctx.beginPath();
+  ctx.moveTo(x0 + rr, y0);
+  ctx.lineTo(x1 - rr, y0);
+  ctx.quadraticCurveTo(x1, y0, x1, y0 + rr);
+  ctx.lineTo(x1, y1 - rr);
+  ctx.quadraticCurveTo(x1, y1, x1 - rr, y1);
+  ctx.lineTo(x0 + rr, y1);
+  ctx.quadraticCurveTo(x0, y1, x0, y1 - rr);
+  ctx.lineTo(x0, y0 + rr);
+  ctx.quadraticCurveTo(x0, y0, x0 + rr, y0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  if (img && img.complete && img.naturalWidth && img.naturalHeight) {
+    const size = Math.min(BUTTON_ICON_SIZE, rect.w - 6, rect.h - 6);
+    const ix = rect.x + (rect.w - size) * 0.5;
+    const iy = rect.y + (rect.h - size) * 0.5;
+    ctx.drawImage(img, ix, iy, size, size);
+  }
+
+  ctx.restore();
+}
 
 export function applyNodeLayout(node) {
   const minW = UI_SETTINGS.previewPadding * 2 + UI_SETTINGS.previewMinWidth;
@@ -47,25 +100,35 @@ export function previewRect(node) {
 
 export function backButtonRect(node) {
   const pad = UI_SETTINGS.previewPadding;
-  const pct = Math.max(10, Math.min(100, Number(UI_SETTINGS.backButtonWidthPercent) || 90));
   const availW = Math.max(10, node.size[0] - pad * 2);
-  const w = Math.max(10, availW * (pct / 100.0));
-  const h = 28;
-  const x = pad + (availW - w) / 2;
+
+  const pct = Math.max(
+    1,
+    Math.min(100, Number(UI_SETTINGS.buttonToolbarWidthPercent) || 100)
+  );
+  const toolbarW = availW * (pct / 100);
+
+  const wSingle = Math.max(10, (toolbarW - 2 * BUTTON_ROW_GAP) / 3);
+  const h = BUTTON_ROW_HEIGHT;
+
+  const x = pad + (availW - toolbarW) * 0.5;
   const y = pad + Number(UI_SETTINGS.backButtonYShift || 0);
-  return { x, y, w, h };
+
+  return { x, y, w: wSingle, h };
 }
 
 export function copyButtonRect(node) {
   const b = backButtonRect(node);
-  const gap = 6;
-  return { x: b.x, y: b.y + b.h + gap, w: b.w, h: b.h };
+  const x = b.x + b.w + BUTTON_ROW_GAP;
+  const y = b.y;
+  return { x, y, w: b.w, h: b.h };
 }
 
 export function pipButtonRect(node) {
   const c = copyButtonRect(node);
-  const gap = 6;
-  return { x: c.x, y: c.y + c.h + gap, w: c.w, h: c.h };
+  const x = c.x + c.w + BUTTON_ROW_GAP;
+  const y = c.y;
+  return { x, y, w: c.w, h: c.h };
 }
 
 
@@ -198,99 +261,15 @@ export function installDraw(node, dbg) {
     const btn = backButtonRect(this);
     const btnEnabled = (state.mode === "compare") && !!state.hasGallery;
 
-    ctx.save();
-    ctx.globalAlpha = btnEnabled ? 1.0 : 0.45;
-    ctx.fillStyle = "#2a2a2a";
-    ctx.strokeStyle = "#555";
-    ctx.lineWidth = 1;
-
-    ctx.beginPath();
-    const rr = 6;
-    const x0 = btn.x, y0 = btn.y, x1 = btn.x + btn.w, y1 = btn.y + btn.h;
-    ctx.moveTo(x0 + rr, y0);
-    ctx.lineTo(x1 - rr, y0);
-    ctx.quadraticCurveTo(x1, y0, x1, y0 + rr);
-    ctx.lineTo(x1, y1 - rr);
-    ctx.quadraticCurveTo(x1, y1, x1 - rr, y1);
-    ctx.lineTo(x0 + rr, y1);
-    ctx.quadraticCurveTo(x0, y1, x0, y1 - rr);
-    ctx.lineTo(x0, y0 + rr);
-    ctx.quadraticCurveTo(x0, y0, x0 + rr, y0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = "#e8e8e8";
-    ctx.font = "14px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Back to gallery", btn.x + btn.w / 2, btn.y + btn.h / 2);
-    ctx.restore();
-
     const copyBtn = copyButtonRect(this);
     const copyBtnEnabled = (state.mode === "compare") && (state.a.loaded || state.b.loaded);
-    // const copyBtnEnabled = (state.mode === "compare") && !!state.hasGallery;
-
-    ctx.save();
-    ctx.globalAlpha = copyBtnEnabled ? 1.0 : 0.45;
-    ctx.fillStyle = "#2a2a2a";
-    ctx.strokeStyle = "#555";
-    ctx.lineWidth = 1;
-
-    ctx.beginPath();
-    const rr2 = 6;
-    const cx0 = copyBtn.x, cy0 = copyBtn.y, cx1 = copyBtn.x + copyBtn.w, cy1 = copyBtn.y + copyBtn.h;
-    ctx.moveTo(cx0 + rr2, cy0);
-    ctx.lineTo(cx1 - rr2, cy0);
-    ctx.quadraticCurveTo(cx1, cy0, cx1, cy0 + rr2);
-    ctx.lineTo(cx1, cy1 - rr2);
-    ctx.quadraticCurveTo(cx1, cy1, cx1 - rr2, cy1);
-    ctx.lineTo(cx0 + rr2, cy1);
-    ctx.quadraticCurveTo(cx0, cy1, cx0, cy1 - rr2);
-    ctx.lineTo(cx0, cy0 + rr2);
-    ctx.quadraticCurveTo(cx0, cy0, cx0 + rr2, cy0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = "#e8e8e8";
-    ctx.font = "14px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Copy image", copyBtn.x + copyBtn.w / 2, copyBtn.y + copyBtn.h / 2);
-    ctx.restore();
 
     const pipBtn = pipButtonRect(this);
     const pipBtnEnabled = true;
 
-    ctx.save();
-    ctx.globalAlpha = pipBtnEnabled ? 1.0 : 0.45;
-    ctx.fillStyle = "#2a2a2a";
-    ctx.strokeStyle = "#555";
-    ctx.lineWidth = 1;
-
-    ctx.beginPath();
-    const rr3 = 6;
-    const px0 = pipBtn.x, py0 = pipBtn.y, px1 = pipBtn.x + pipBtn.w, py1 = pipBtn.y + pipBtn.h;
-    ctx.moveTo(px0 + rr3, py0);
-    ctx.lineTo(px1 - rr3, py0);
-    ctx.quadraticCurveTo(px1, py0, px1, py0 + rr3);
-    ctx.lineTo(px1, py1 - rr3);
-    ctx.quadraticCurveTo(px1, py1, px1 - rr3, py1);
-    ctx.lineTo(px0 + rr3, py1);
-    ctx.quadraticCurveTo(px0, py1, px0, py1 - rr3);
-    ctx.lineTo(px0, py0 + rr3);
-    ctx.quadraticCurveTo(px0, py0, px0 + rr3, py0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = "#e8e8e8";
-    ctx.font = "14px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Open PIP", pipBtn.x + pipBtn.w / 2, pipBtn.y + pipBtn.h / 2);
-    ctx.restore();
+    drawIconButton(ctx, btn, AKBASE_ICONS.back, btnEnabled);
+    drawIconButton(ctx, copyBtn, AKBASE_ICONS.copy, copyBtnEnabled);
+    drawIconButton(ctx, pipBtn, AKBASE_ICONS.pip, pipBtnEnabled);
 
     // if (!state._drawLogged) {
     //   state._drawLogged = true;
