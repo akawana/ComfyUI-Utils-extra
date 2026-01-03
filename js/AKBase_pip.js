@@ -71,7 +71,7 @@ function cleanupPipWindow(container) {
     }
     container._akPipDragCleanup = null;
     container._akPipResizeCleanup = null;
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function destroyPipWindow(container) {
@@ -223,7 +223,7 @@ function createPipWindow(nodeId) {
 
     const oldZoom = pipState.zoom || 1;
     const zoomFactor = e.deltaY < 0 ? 1.1 : 1.0 / 1.1;
-    const newZoom = Math.min(5, Math.max(0.2, oldZoom * zoomFactor));
+    const newZoom = Math.min(20, Math.max(0.2, oldZoom * zoomFactor));
 
     // Determine if pointer is currently over the canvas
     const overCanvas =
@@ -723,6 +723,7 @@ function startPipRenderLoop(container, canvas) {
   function frame() {
     if (!document.body.contains(container)) return;
 
+
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     const logicalWidth = rect.width || (canvas.width / dpr);
@@ -762,7 +763,7 @@ function startPipRenderLoop(container, canvas) {
       }
     }
 
-    ctx.save();
+    // ctx.save();
     ctx.scale(dpr, dpr);
 
     const zoom = pipState.zoom || 1;
@@ -785,7 +786,17 @@ function startPipRenderLoop(container, canvas) {
       }
     }
 
-        if (state && state.mode === "compare" && typeof renderCompare === "function") {
+    ctx.save(); // local save for clipping
+    ctx.beginPath();
+    ctx.rect(
+      0,
+      0,
+      logicalWidth,
+      logicalHeight
+    );
+    ctx.clip();
+
+    if (state && state.mode === "compare" && typeof renderCompare === "function") {
       const view = {
         zoom: 1,
         offsetX: 0,
