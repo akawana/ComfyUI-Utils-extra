@@ -1,4 +1,3 @@
-
 class AnyType(str):
     def __ne__(self, __value: object) -> bool:
         return False
@@ -23,11 +22,13 @@ class CLIPEncodeMultiple:
                 "starting_index": ("INT", {"default": 0, "min": 0, "step": 1}),
                 "length": ("INT", {"default": 1, "min": 1, "max": 20, "step": 1}),
             },
-            "optional": {}
+            "optional": {
+                "mask_list": ("MASK",),
+            },
         }
 
-    RETURN_TYPES = ("CONDITIONING",) * 20
-    RETURN_NAMES = tuple(f"cond_{i}" for i in range(20))
+    RETURN_TYPES = ("CONDITIONING",) + ("CONDITIONING",) * 20
+    RETURN_NAMES = ("combined_con",) + tuple(f"cond_{i}" for i in range(20))
 
     FUNCTION = "execute"
     CATEGORY = "conditioning"
@@ -52,6 +53,7 @@ class CLIPEncodeMultiple:
     def _encode_text(cls, clip, text):
         tokens = clip.tokenize(text)
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
+        # base conditioning without any mask; masks are applied per-call
         return [[cond, {"pooled_output": pooled}]]
 
     @staticmethod
@@ -64,13 +66,20 @@ class CLIPEncodeMultiple:
             return id(inner)
         return id(clip)
 
-    # @classmethod
-    # def _encode_text(cls, clip, text):
-    #     tokens = clip.tokenize(text)
-    #     cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
-    #     return [[cond, {"pooled_output": pooled}]]
+    @staticmethod
+    def _apply_mask_to_cond(base_cond, mask):
+        if mask is None:
+            return base_cond
+        # Create a shallow copy of the conditioning list and per-entry dicts
+        cond_with_mask = []
+        for t, data in base_cond:
+            data_copy = dict(data) if data is not None else {}
+            data_copy["mask"] = mask
+            data_copy["mask_strength"] = 1.0
+            cond_with_mask.append([t, data_copy])
+        return cond_with_mask
 
-    def execute(self, clip, input_any, starting_index, length):
+    def execute(self, clip, input_any, starting_index, length, mask_list=None):
         # Unwrap list inputs when INPUT_IS_LIST is True
         if isinstance(clip, (list, tuple)):
             clip_obj = clip[0]
@@ -92,6 +101,17 @@ class CLIPEncodeMultiple:
         ):
             raise RuntimeError("Require array of strings")
 
+        # Normalize mask_list into a flat list (may be empty)
+        masks = []
+        if mask_list is not None:
+            if isinstance(mask_list, (list, tuple)):
+                if len(mask_list) == 1 and isinstance(mask_list[0], (list, tuple)):
+                    masks = list(mask_list[0])
+                else:
+                    masks = list(mask_list)
+            else:
+                masks = [mask_list]
+
         # starting_index and length also come as lists when INPUT_IS_LIST = True
         if isinstance(starting_index, (list, tuple)):
             start_raw = starting_index[0] if starting_index else 0
@@ -112,46 +132,74 @@ class CLIPEncodeMultiple:
 
         result = []
         empty_cond = None
+        combined_cond = None
 
-        # encode 
+        # encode
         for i in range(length_val):
             idx = start + i
 
+            cond = None
             if 0 <= idx < len(items):
                 v = items[idx]
+                # pick mask for this index if available
+                mask_for_idx = None
+                if 0 <= idx < len(masks):
+                    mask_for_idx = masks[idx]
+
                 if v is None:
                     if empty_cond is None:
                         empty_cond = self._get_empty_cond(clip_obj)
-                    cond = empty_cond
+                    base_cond = empty_cond
                     CLIPEncodeMultiple.last_items[idx] = None
                 else:
-                    # cond = self._encode_text(clip_obj, v)
                     clip_id = self._clip_key(clip_obj)
                     prev = CLIPEncodeMultiple.last_items[idx]
-                    print("[idx]", idx, "eq_prev=", (v == prev), "len(v)=", len(v), "len(prev)=", (len(prev) if prev else None))
+                    print(
+                        "[idx]",
+                        idx,
+                        "eq_prev=",
+                        (v == prev),
+                        "len(v)=",
+                        len(v),
+                        "len(prev)=",
+                        (len(prev) if prev else None),
+                    )
                     if v == prev:
                         cached = CLIPEncodeMultiple.idx_cache.get((clip_id, idx))
                         print("[CACHE]", idx)
                         if cached is not None:
-                            cond = cached
+                            base_cond = cached
                         else:
-                            cond = self._encode_text(clip_obj, v)
-                            CLIPEncodeMultiple.idx_cache[(clip_id, idx)] = cond
+                            base_cond = self._encode_text(clip_obj, v)
+                            CLIPEncodeMultiple.idx_cache[(clip_id, idx)] = base_cond
                     else:
-                        cond = self._encode_text(clip_obj, v)
-                        CLIPEncodeMultiple.idx_cache[(clip_id, idx)] = cond
+                        base_cond = self._encode_text(clip_obj, v)
+                        CLIPEncodeMultiple.idx_cache[(clip_id, idx)] = base_cond
                         CLIPEncodeMultiple.last_items[idx] = v
-                        print("[ENCODE]", idx, "len=", len(v), "prev_len=", (len(prev) if prev else None))
+                        print(
+                            "[ENCODE]",
+                            idx,
+                            "len=",
+                            len(v),
+                            "prev_len=",
+                            (len(prev) if prev else None),
+                        )
 
-            else:
-                cond = None
+                # apply mask (if any) to a copy of the base conditioning
+                cond = self._apply_mask_to_cond(base_cond, mask_for_idx)
+                if v is not None and cond is not None:
+                    if combined_cond is None:
+                        combined_cond = []
+                    for t, data in cond:
+                        data_copy = dict(data) if data is not None else {}
+                        combined_cond.append([t, data_copy])
 
             result.append(cond)
 
         if length_val < 20:
             result.extend([None] * (20 - length_val))
 
-        return tuple(result)
+        return (combined_cond,) + tuple(result)
 
 
 NODE_CLASS_MAPPINGS = {"CLIPEncodeMultiple": CLIPEncodeMultiple}
